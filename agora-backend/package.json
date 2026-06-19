@@ -4,7 +4,10 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "dev": "nodemon",
+    "build": "tsc",
+    "start": "node dist/server.js"
   },
   "prisma": {
     "seed": "ts-node prisma/seed.ts"
@@ -15,6 +18,7 @@
   "type": "commonjs",
   "devDependencies": {
     "@types/bcryptjs": "^2.4.6",
+    "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
     "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^26.0.0",
