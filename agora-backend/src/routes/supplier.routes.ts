@@ -1,6 +1,8 @@
-    import { Router } from 'express'
+import { Router } from 'express'
 import { protect } from '../middleware/auth.middleware'
 import { allow } from '../middleware/rbac.middleware'
+import { validate } from '../middleware/validate.middleware'
+import { createSupplierSchema, updateSupplierSchema } from '../schemas/supplier.schema'
 import {
   getSuppliers,
   getSupplierById,
@@ -13,8 +15,8 @@ const router = Router()
 
 router.get('/',       protect, getSuppliers)
 router.get('/:id',    protect, getSupplierById)
-router.post('/',      protect, allow('ADMIN', 'SUPER_ADMIN'), createSupplier)
-router.put('/:id',    protect, allow('ADMIN', 'SUPER_ADMIN'), updateSupplier)
+router.post('/',      protect, allow('ADMIN', 'SUPER_ADMIN'), validate(createSupplierSchema), createSupplier)
+router.put('/:id',    protect, allow('ADMIN', 'SUPER_ADMIN'), validate(updateSupplierSchema), updateSupplier)
 router.delete('/:id', protect, allow('ADMIN', 'SUPER_ADMIN'), deleteSupplier)
 
 export default router
