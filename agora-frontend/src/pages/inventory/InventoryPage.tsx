@@ -7,15 +7,52 @@ import type { Product, Category, Supplier } from '../../types/inventory';
 
 type Tab = 'products' | 'categories' | 'suppliers';
 
+// ── design tokens ────────────────────────────────────────────────────────────
+const BG_BASE = '#0f172a';
+const BG_CARD = '#1e293b';
+const BORDER = '#334155';
+const TEXT_PRIMARY = '#f1f5f9';
+const TEXT_SECONDARY = '#94a3b8';
+const TEXT_MUTED = '#475569';
+const ACCENT = '#f59e0b';
+const ACCENT_DIM = 'rgba(245,158,11,0.12)';
+const SUCCESS = '#34d399';
+const SUCCESS_DIM = 'rgba(52,211,153,0.12)';
+const DANGER = '#f87171';
+const DANGER_DIM = 'rgba(248,113,113,0.12)';
+
+const card = (extra?: React.CSSProperties): React.CSSProperties => ({
+  background: BG_CARD,
+  border: `1px solid ${BORDER}`,
+  borderRadius: '12px',
+  ...extra,
+});
+
+const labelStyle: React.CSSProperties = {
+  fontSize: '11px',
+  fontWeight: 700,
+  letterSpacing: '0.08em',
+  textTransform: 'uppercase',
+  color: TEXT_MUTED,
+  marginBottom: '6px',
+};
+
+const inputStyle: React.CSSProperties = {
+  background: BG_BASE,
+  border: `1px solid ${BORDER}`,
+  borderRadius: 8,
+  padding: '10px 14px',
+  color: TEXT_PRIMARY,
+  fontSize: 13,
+  outline: 'none',
+};
+
 const peso = (value: number) =>
   `₱${value.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
 export default function InventoryPage() {
   const [tab, setTab] = useState<Tab>('products');
 
-  // TODO: swap this local state for React Query — useQuery for GET
-  // /products, /categories, /suppliers and useMutation for the
-  // POST/PUT/DELETE calls — once those backend endpoints are live.
   const [products, setProducts] = useState<Product[]>(mockProducts);
   const [categories, setCategories] = useState<Category[]>(mockCategories);
   const [suppliers, setSuppliers] = useState<Supplier[]>(mockSuppliers);
@@ -25,10 +62,8 @@ export default function InventoryPage() {
 
   const [productModalOpen, setProductModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
-
   const [categoryModalOpen, setCategoryModalOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
-
   const [supplierModalOpen, setSupplierModalOpen] = useState(false);
   const [editingSupplier, setEditingSupplier] = useState<Supplier | null>(null);
 
@@ -39,7 +74,9 @@ export default function InventoryPage() {
     return products.filter((p) => {
       const q = search.toLowerCase();
       const matchesSearch =
-        p.name.toLowerCase().includes(q) || p.sku.toLowerCase().includes(q) || (p.barcode ?? '').includes(search);
+        p.name.toLowerCase().includes(q) ||
+        p.sku.toLowerCase().includes(q) ||
+        (p.barcode ?? '').includes(search);
       const matchesCategory = !categoryFilter || p.categoryId === categoryFilter;
       return matchesSearch && matchesCategory;
     });
@@ -52,11 +89,11 @@ export default function InventoryPage() {
     });
   };
 
-  // Products are never hard-deleted, only deactivated, so past orders
-  // that reference them still display correctly in reports and receipts.
   const handleToggleProductStatus = (product: Product) => {
     setProducts((prev) =>
-      prev.map((p) => (p.id === product.id ? { ...p, status: p.status === 'active' ? 'inactive' : 'active' } : p))
+      prev.map((p) =>
+        p.id === product.id ? { ...p, status: p.status === 'active' ? 'inactive' : 'active' } : p
+      )
     );
   };
 
@@ -96,124 +133,159 @@ export default function InventoryPage() {
     }
   };
 
+  const TABS: Tab[] = ['products', 'categories', 'suppliers'];
+
+  // ── shared table styles ───────────────────────────────────────────────────
+  const thStyle: React.CSSProperties = {
+    padding: '12px 20px',
+    textAlign: 'left',
+    fontSize: 11,
+    fontWeight: 700,
+    color: TEXT_MUTED,
+    textTransform: 'uppercase',
+    letterSpacing: '0.06em',
+    background: BG_BASE,
+  };
+
+  const tdStyle: React.CSSProperties = {
+    padding: '14px 20px',
+    fontSize: 13,
+    borderTop: `1px solid ${BORDER}`,
+  };
+
   return (
-    <div className="space-y-6">
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+
+      {/* Header */}
       <div>
-        <h1 className="text-2xl font-semibold text-slate-900">Inventory</h1>
-        <p className="text-sm text-slate-500">Manage your product catalog, categories, and suppliers.</p>
+        <h1 style={{ color: TEXT_PRIMARY, fontSize: 22, fontWeight: 700, margin: 0 }}>Inventory</h1>
+        <p style={{ color: TEXT_MUTED, fontSize: 13, marginTop: 4 }}>
+          Manage your product catalog, categories, and suppliers.
+        </p>
       </div>
 
-      <div className="flex gap-1 border-b border-slate-200">
-        {(['products', 'categories', 'suppliers'] as Tab[]).map((t) => (
+      {/* Tab bar */}
+      <div style={{ display: 'flex', gap: 4, borderBottom: `1px solid ${BORDER}` }}>
+        {TABS.map((t) => (
           <button
             key={t}
             onClick={() => setTab(t)}
-            className={`relative px-4 py-2.5 text-sm font-medium capitalize transition-colors ${
-              tab === t ? 'text-amber-700' : 'text-slate-500 hover:text-slate-700'
-            }`}
+            style={{
+              position: 'relative',
+              padding: '10px 18px',
+              fontSize: 13,
+              fontWeight: 600,
+              textTransform: 'capitalize',
+              background: 'none',
+              border: 'none',
+              cursor: 'pointer',
+              color: tab === t ? ACCENT : TEXT_MUTED,
+              transition: 'color 0.15s',
+            }}
           >
             {t}
-            {tab === t && <span className="absolute inset-x-0 -bottom-px h-0.5 rounded-full bg-amber-600" />}
+            {tab === t && (
+              <span style={{
+                position: 'absolute',
+                bottom: -1,
+                left: 0,
+                right: 0,
+                height: 2,
+                borderRadius: 2,
+                background: ACCENT,
+              }} />
+            )}
           </button>
         ))}
       </div>
 
+      {/* ── Products Tab ── */}
       {tab === 'products' && (
-        <div className="space-y-4">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="flex flex-wrap items-center gap-3">
-              <div className="relative">
-                <svg
-                  className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
-                  width="16"
-                  height="16"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                >
-                  <circle cx="11" cy="11" r="7" />
-                  <path d="m21 21-4.3-4.3" />
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 10 }}>
+              {/* Search */}
+              <div style={{ position: 'relative' }}>
+                <svg style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: TEXT_MUTED, pointerEvents: 'none' }}
+                  width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <circle cx="11" cy="11" r="7" /><path d="m21 21-4.3-4.3" />
                 </svg>
                 <input
                   type="text"
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   placeholder="Search name, SKU, or barcode"
-                  className="w-64 rounded-lg border border-slate-300 py-2 pl-9 pr-3 text-sm focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500"
+                  style={{ ...inputStyle, paddingLeft: 34, width: 240 }}
                 />
               </div>
+              {/* Category filter */}
               <select
                 value={categoryFilter}
                 onChange={(e) => setCategoryFilter(e.target.value)}
-                className="rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500"
+                style={{ ...inputStyle, paddingRight: 28 }}
               >
                 <option value="">All categories</option>
                 {categories.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                  </option>
+                  <option key={c.id} value={c.id}>{c.name}</option>
                 ))}
               </select>
             </div>
             <button
-              onClick={() => {
-                setEditingProduct(null);
-                setProductModalOpen(true);
-              }}
-              className="rounded-lg bg-amber-600 px-4 py-2 text-sm font-medium text-white hover:bg-amber-700"
+              onClick={() => { setEditingProduct(null); setProductModalOpen(true); }}
+              style={{ background: ACCENT, color: '#fff', border: 'none', borderRadius: 8, padding: '10px 18px', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}
             >
               + Add product
             </button>
           </div>
 
-          <div className="overflow-hidden rounded-xl border border-slate-200">
-            <table className="w-full text-sm">
-              <thead className="bg-slate-50 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+          <div style={card({ overflow: 'hidden', padding: 0 })}>
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <thead>
                 <tr>
-                  <th className="px-4 py-3">Product</th>
-                  <th className="px-4 py-3">SKU / Barcode</th>
-                  <th className="px-4 py-3">Category</th>
-                  <th className="px-4 py-3">Supplier</th>
-                  <th className="px-4 py-3 text-right">Price</th>
-                  <th className="px-4 py-3">Status</th>
-                  <th className="px-4 py-3 text-right">Actions</th>
+                  {['Product', 'SKU / Barcode', 'Category', 'Supplier', 'Price', 'Status', ''].map((h, i) => (
+                    <th key={h} style={{ ...thStyle, textAlign: i >= 4 ? 'right' : 'left' }}>{h}</th>
+                  ))}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody>
                 {filteredProducts.map((p) => (
-                  <tr key={p.id} className="hover:bg-slate-50">
-                    <td className="px-4 py-3 font-medium text-slate-900">{p.name}</td>
-                    <td className="px-4 py-3 text-slate-500">
-                      <div>{p.sku}</div>
-                      {p.barcode && <div className="text-xs text-slate-400">{p.barcode}</div>}
+                  <tr key={p.id} style={{ background: 'transparent' }}
+                    onMouseEnter={(e) => (e.currentTarget.style.background = BG_BASE)}
+                    onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}>
+                    <td style={{ ...tdStyle, color: TEXT_PRIMARY, fontWeight: 600 }}>{p.name}</td>
+                    <td style={{ ...tdStyle, color: TEXT_SECONDARY }}>
+                      <div style={{ fontFamily: 'monospace', fontSize: 12 }}>{p.sku}</div>
+                      {p.barcode && <div style={{ fontSize: 11, color: TEXT_MUTED }}>{p.barcode}</div>}
                     </td>
-                    <td className="px-4 py-3 text-slate-600">{categoryName(p.categoryId)}</td>
-                    <td className="px-4 py-3 text-slate-600">{supplierName(p.supplierId)}</td>
-                    <td className="px-4 py-3 text-right font-medium text-slate-900">{peso(p.price)}</td>
-                    <td className="px-4 py-3">
-                      <span
-                        className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                          p.status === 'active' ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'
-                        }`}
-                      >
+                    <td style={{ ...tdStyle, color: TEXT_SECONDARY }}>{categoryName(p.categoryId)}</td>
+                    <td style={{ ...tdStyle, color: TEXT_SECONDARY }}>{supplierName(p.supplierId)}</td>
+                    <td style={{ ...tdStyle, color: TEXT_PRIMARY, fontWeight: 700, textAlign: 'right' }}>{peso(p.price)}</td>
+                    <td style={{ ...tdStyle, textAlign: 'right' }}>
+                      <span style={{
+                        fontSize: 10, fontWeight: 700, padding: '3px 10px', borderRadius: 20,
+                        background: p.status === 'active' ? SUCCESS_DIM : 'rgba(100,116,139,0.15)',
+                        color: p.status === 'active' ? SUCCESS : TEXT_MUTED,
+                      }}>
                         {p.status === 'active' ? 'Active' : 'Inactive'}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-right">
-                      <div className="flex justify-end gap-2">
+                    <td style={{ ...tdStyle, textAlign: 'right' }}>
+                      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 6 }}>
                         <button
-                          onClick={() => {
-                            setEditingProduct(p);
-                            setProductModalOpen(true);
-                          }}
-                          className="rounded-md px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-100"
+                          onClick={() => { setEditingProduct(p); setProductModalOpen(true); }}
+                          style={{ background: 'none', border: `1px solid ${BORDER}`, borderRadius: 6, padding: '4px 10px', fontSize: 12, color: TEXT_SECONDARY, cursor: 'pointer' }}
                         >
                           Edit
                         </button>
                         <button
                           onClick={() => handleToggleProductStatus(p)}
-                          className="rounded-md px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-100"
+                          style={{
+                            background: 'none',
+                            border: `1px solid ${p.status === 'active' ? 'rgba(248,113,113,0.4)' : 'rgba(52,211,153,0.4)'}`,
+                            borderRadius: 6, padding: '4px 10px', fontSize: 12,
+                            color: p.status === 'active' ? DANGER : SUCCESS,
+                            cursor: 'pointer',
+                          }}
                         >
                           {p.status === 'active' ? 'Deactivate' : 'Activate'}
                         </button>
@@ -223,7 +295,7 @@ export default function InventoryPage() {
                 ))}
                 {filteredProducts.length === 0 && (
                   <tr>
-                    <td colSpan={7} className="px-4 py-10 text-center text-sm text-slate-400">
+                    <td colSpan={7} style={{ padding: '48px', textAlign: 'center', color: TEXT_MUTED, fontSize: 13 }}>
                       No products match your search.
                     </td>
                   </tr>
@@ -234,54 +306,46 @@ export default function InventoryPage() {
         </div>
       )}
 
+      {/* ── Categories Tab ── */}
       {tab === 'categories' && (
-        <div className="space-y-4">
-          <div className="flex justify-end">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
             <button
-              onClick={() => {
-                setEditingCategory(null);
-                setCategoryModalOpen(true);
-              }}
-              className="rounded-lg bg-amber-600 px-4 py-2 text-sm font-medium text-white hover:bg-amber-700"
+              onClick={() => { setEditingCategory(null); setCategoryModalOpen(true); }}
+              style={{ background: ACCENT, color: '#fff', border: 'none', borderRadius: 8, padding: '10px 18px', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}
             >
               + Add category
             </button>
           </div>
-          <div className="overflow-hidden rounded-xl border border-slate-200">
-            <table className="w-full text-sm">
-              <thead className="bg-slate-50 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+          <div style={card({ overflow: 'hidden', padding: 0 })}>
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <thead>
                 <tr>
-                  <th className="px-4 py-3">Name</th>
-                  <th className="px-4 py-3">Description</th>
-                  <th className="px-4 py-3 text-right">Products</th>
-                  <th className="px-4 py-3 text-right">Actions</th>
+                  {['Name', 'Description', 'Products', ''].map((h, i) => (
+                    <th key={h} style={{ ...thStyle, textAlign: i >= 2 ? 'right' : 'left' }}>{h}</th>
+                  ))}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody>
                 {categories.map((c) => (
-                  <tr key={c.id} className="hover:bg-slate-50">
-                    <td className="px-4 py-3 font-medium text-slate-900">{c.name}</td>
-                    <td className="px-4 py-3 text-slate-500">{c.description || '—'}</td>
-                    <td className="px-4 py-3 text-right text-slate-600">
+                  <tr key={c.id}
+                    onMouseEnter={(e) => (e.currentTarget.style.background = BG_BASE)}
+                    onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}>
+                    <td style={{ ...tdStyle, color: TEXT_PRIMARY, fontWeight: 600 }}>{c.name}</td>
+                    <td style={{ ...tdStyle, color: TEXT_SECONDARY }}>{c.description || '—'}</td>
+                    <td style={{ ...tdStyle, color: TEXT_SECONDARY, textAlign: 'right' }}>
                       {products.filter((p) => p.categoryId === c.id).length}
                     </td>
-                    <td className="px-4 py-3 text-right">
-                      <div className="flex justify-end gap-2">
+                    <td style={{ ...tdStyle, textAlign: 'right' }}>
+                      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 6 }}>
                         <button
-                          onClick={() => {
-                            setEditingCategory(c);
-                            setCategoryModalOpen(true);
-                          }}
-                          className="rounded-md px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-100"
-                        >
-                          Edit
-                        </button>
+                          onClick={() => { setEditingCategory(c); setCategoryModalOpen(true); }}
+                          style={{ background: 'none', border: `1px solid ${BORDER}`, borderRadius: 6, padding: '4px 10px', fontSize: 12, color: TEXT_SECONDARY, cursor: 'pointer' }}
+                        >Edit</button>
                         <button
                           onClick={() => handleDeleteCategory(c.id)}
-                          className="rounded-md px-2 py-1 text-xs font-medium text-rose-600 hover:bg-rose-50"
-                        >
-                          Delete
-                        </button>
+                          style={{ background: 'none', border: '1px solid rgba(248,113,113,0.4)', borderRadius: 6, padding: '4px 10px', fontSize: 12, color: DANGER, cursor: 'pointer' }}
+                        >Delete</button>
                       </div>
                     </td>
                   </tr>
@@ -292,56 +356,47 @@ export default function InventoryPage() {
         </div>
       )}
 
+      {/* ── Suppliers Tab ── */}
       {tab === 'suppliers' && (
-        <div className="space-y-4">
-          <div className="flex justify-end">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
             <button
-              onClick={() => {
-                setEditingSupplier(null);
-                setSupplierModalOpen(true);
-              }}
-              className="rounded-lg bg-amber-600 px-4 py-2 text-sm font-medium text-white hover:bg-amber-700"
+              onClick={() => { setEditingSupplier(null); setSupplierModalOpen(true); }}
+              style={{ background: ACCENT, color: '#fff', border: 'none', borderRadius: 8, padding: '10px 18px', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}
             >
               + Add supplier
             </button>
           </div>
-          <div className="overflow-hidden rounded-xl border border-slate-200">
-            <table className="w-full text-sm">
-              <thead className="bg-slate-50 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+          <div style={card({ overflow: 'hidden', padding: 0 })}>
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <thead>
                 <tr>
-                  <th className="px-4 py-3">Name</th>
-                  <th className="px-4 py-3">Contact</th>
-                  <th className="px-4 py-3">Address</th>
-                  <th className="px-4 py-3 text-right">Products</th>
-                  <th className="px-4 py-3 text-right">Actions</th>
+                  {['Name', 'Contact', 'Address', 'Products', ''].map((h, i) => (
+                    <th key={h} style={{ ...thStyle, textAlign: i >= 3 ? 'right' : 'left' }}>{h}</th>
+                  ))}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody>
                 {suppliers.map((s) => (
-                  <tr key={s.id} className="hover:bg-slate-50">
-                    <td className="px-4 py-3 font-medium text-slate-900">{s.name}</td>
-                    <td className="px-4 py-3 text-slate-500">{s.contact}</td>
-                    <td className="px-4 py-3 text-slate-500">{s.address || '—'}</td>
-                    <td className="px-4 py-3 text-right text-slate-600">
+                  <tr key={s.id}
+                    onMouseEnter={(e) => (e.currentTarget.style.background = BG_BASE)}
+                    onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}>
+                    <td style={{ ...tdStyle, color: TEXT_PRIMARY, fontWeight: 600 }}>{s.name}</td>
+                    <td style={{ ...tdStyle, color: TEXT_SECONDARY }}>{s.contact}</td>
+                    <td style={{ ...tdStyle, color: TEXT_SECONDARY }}>{s.address || '—'}</td>
+                    <td style={{ ...tdStyle, color: TEXT_SECONDARY, textAlign: 'right' }}>
                       {products.filter((p) => p.supplierId === s.id).length}
                     </td>
-                    <td className="px-4 py-3 text-right">
-                      <div className="flex justify-end gap-2">
+                    <td style={{ ...tdStyle, textAlign: 'right' }}>
+                      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 6 }}>
                         <button
-                          onClick={() => {
-                            setEditingSupplier(s);
-                            setSupplierModalOpen(true);
-                          }}
-                          className="rounded-md px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-100"
-                        >
-                          Edit
-                        </button>
+                          onClick={() => { setEditingSupplier(s); setSupplierModalOpen(true); }}
+                          style={{ background: 'none', border: `1px solid ${BORDER}`, borderRadius: 6, padding: '4px 10px', fontSize: 12, color: TEXT_SECONDARY, cursor: 'pointer' }}
+                        >Edit</button>
                         <button
                           onClick={() => handleDeleteSupplier(s.id)}
-                          className="rounded-md px-2 py-1 text-xs font-medium text-rose-600 hover:bg-rose-50"
-                        >
-                          Delete
-                        </button>
+                          style={{ background: 'none', border: '1px solid rgba(248,113,113,0.4)', borderRadius: 6, padding: '4px 10px', fontSize: 12, color: DANGER, cursor: 'pointer' }}
+                        >Delete</button>
                       </div>
                     </td>
                   </tr>

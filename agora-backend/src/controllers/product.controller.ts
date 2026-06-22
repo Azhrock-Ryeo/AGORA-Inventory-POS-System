@@ -9,7 +9,9 @@ export async function getProducts(req: Request, res: Response) {
       where: {
         ...(search && { name: { contains: String(search), mode: 'insensitive' } }),
         ...(category_id && { category_id: String(category_id) }),
-        ...(status && { status: String(status) as any }),
+        ...(status && {
+  status: String(status).toUpperCase() as any,
+}),
       },
       include: {
         category: true,
@@ -24,8 +26,12 @@ export async function getProducts(req: Request, res: Response) {
     const total = await prisma.product.count()
     res.json({ data: products, total, page: Number(page), limit: Number(limit) })
   } catch (err) {
-    res.status(500).json({ message: 'Failed to fetch products' })
-  }
+  console.error(err)
+  res.status(500).json({
+    message: 'Failed to fetch products',
+    error: err,
+  })
+}
 }
 
 export async function getProductById(req: Request, res: Response) {

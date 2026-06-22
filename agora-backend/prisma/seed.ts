@@ -17,7 +17,45 @@ async function main() {
     },
   })
   console.log('✅ Super Admin seeded')
+// ─── Admin ─────────────────────────────────────────
+const adminHash = await bcrypt.hash('Admin@1234', 12)
+await prisma.user.upsert({
+  where: { email: 'admin2@agora.com' },
+  update: {},
+  create: {
+    name: 'Store Admin',
+    email: 'admin2@agora.com',
+    password_hash: adminHash,
+    role: 'ADMIN',
+  },
+})
 
+// ─── Manager ───────────────────────────────────────
+const managerHash = await bcrypt.hash('Manager@1234', 12)
+await prisma.user.upsert({
+  where: { email: 'manager@agora.com' },
+  update: {},
+  create: {
+    name: 'Store Manager',
+    email: 'manager@agora.com',
+    password_hash: managerHash,
+    role: 'MANAGER',
+  },
+})
+
+// ─── Cashier ───────────────────────────────────────
+const cashierHash = await bcrypt.hash('Cashier@1234', 12)
+await prisma.user.upsert({
+  where: { email: 'cashier@agora.com' },
+  update: {},
+  create: {
+    name: 'Store Cashier',
+    email: 'cashier@agora.com',
+    password_hash: cashierHash,
+    role: 'CASHIER',
+  },
+})
+console.log('✅ Admin, Manager, Cashier seeded')
   // ─── Categories ────────────────────────────────────
   const categoryNames = ['Beverages', 'Snacks', 'Dairy', 'Cleaning Supplies', 'Electronics']
   for (const name of categoryNames) {

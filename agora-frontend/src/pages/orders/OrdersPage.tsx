@@ -26,19 +26,50 @@ interface Order {
   discount: number
   status: string
   created_at: string
+  cashier?: { name: string }
   order_items?: { product: Product; quantity: number; unit_price: number }[]
 }
 
 type DiscountType = 'flat' | 'percentage'
 type ActiveTab = 'pos' | 'history'
 
+// ── design tokens (matching DashboardPage) ────────────────────────────────────
+const BG_BASE = '#0f172a'
+const BG_CARD = '#1e293b'
+const BORDER = '#334155'
+const TEXT_PRIMARY = '#f1f5f9'
+const TEXT_SECONDARY = '#94a3b8'
+const TEXT_MUTED = '#475569'
+const ACCENT = '#f59e0b'
+const ACCENT_DIM = 'rgba(245,158,11,0.12)'
+const SUCCESS = '#34d399'
+const SUCCESS_DIM = 'rgba(52,211,153,0.12)'
+const DANGER = '#f87171'
+const DANGER_DIM = 'rgba(248,113,113,0.12)'
+
+const peso = (v: number) =>
+  `₱${Number(v).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+
+const card = (extra?: React.CSSProperties): React.CSSProperties => ({
+  background: BG_CARD,
+  border: `1px solid ${BORDER}`,
+  borderRadius: '12px',
+  ...extra,
+})
+
+const labelStyle: React.CSSProperties = {
+  fontSize: '11px',
+  fontWeight: 700,
+  letterSpacing: '0.08em',
+  textTransform: 'uppercase',
+  color: TEXT_MUTED,
+  marginBottom: '6px',
+}
+
 export default function OrdersPage() {
   const queryClient = useQueryClient()
 
-  // Tab
   const [activeTab, setActiveTab] = useState<ActiveTab>('pos')
-
-  // POS State
   const [search, setSearch] = useState('')
   const [cart, setCart] = useState<CartItem[]>([])
   const [discountType, setDiscountType] = useState<DiscountType>('flat')
@@ -47,32 +78,27 @@ export default function OrdersPage() {
   const [completedOrder, setCompletedOrder] = useState<Order | null>(null)
   const [amountPaid, setAmountPaid] = useState<number>(0)
   const [showPayment, setShowPayment] = useState(false)
-
-  // Order History State
   const [historySearch, setHistorySearch] = useState('')
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null)
   const [showOrderDetail, setShowOrderDetail] = useState(false)
 
-  // Fetch products for POS
   const { data: products = [] } = useQuery<Product[]>({
     queryKey: ['products', search],
     queryFn: async () => {
       const res = await api.get('/products', { params: { search, status: 'active' } })
-      return res.data
+      return res.data?.data ?? res.data ?? []
     },
   })
 
-  // Fetch order history
   const { data: orders = [] } = useQuery<Order[]>({
     queryKey: ['orders', historySearch],
     queryFn: async () => {
       const res = await api.get('/orders', { params: { search: historySearch } })
-      return res.data
+      return res.data?.data ?? res.data ?? []
     },
     enabled: activeTab === 'history',
   })
 
-  // Create order mutation
   const createOrder = useMutation({
     mutationFn: async (payload: object) => {
       const res = await api.post('/orders', payload)
@@ -87,52 +113,33 @@ export default function OrdersPage() {
     },
   })
 
-  // Cart helpers
   const addToCart = (product: Product) => {
     setCart((prev) => {
       const existing = prev.find((i) => i.product.id === product.id)
-      if (existing) {
-        return prev.map((i) =>
-          i.product.id === product.id ? { ...i, quantity: i.quantity + 1 } : i
-        )
-      }
+      if (existing) return prev.map((i) => i.product.id === product.id ? { ...i, quantity: i.quantity + 1 } : i)
       return [...prev, { product, quantity: 1, unit_price: product.price }]
     })
   }
 
   const updateQty = (productId: string, qty: number) => {
-    if (qty <= 0) {
-      setCart((prev) => prev.filter((i) => i.product.id !== productId))
-    } else {
-      setCart((prev) =>
-        prev.map((i) => (i.product.id === productId ? { ...i, quantity: qty } : i))
-      )
-    }
+    if (qty <= 0) setCart((prev) => prev.filter((i) => i.product.id !== productId))
+    else setCart((prev) => prev.map((i) => i.product.id === productId ? { ...i, quantity: qty } : i))
   }
 
   const removeFromCart = (productId: string) =>
     setCart((prev) => prev.filter((i) => i.product.id !== productId))
 
   const subtotal = cart.reduce((sum, i) => sum + i.unit_price * i.quantity, 0)
-  const discountAmount =
-    discountType === 'flat' ? discountValue : (subtotal * discountValue) / 100
+  const discountAmount = discountType === 'flat' ? discountValue : (subtotal * discountValue) / 100
   const total = Math.max(0, subtotal - discountAmount)
   const change = amountPaid - total
 
-  const handleCheckout = () => {
-    if (cart.length === 0) return
-    setAmountPaid(0)
-    setShowPayment(true)
-  }
+  const handleCheckout = () => { if (cart.length === 0) return; setAmountPaid(0); setShowPayment(true) }
 
   const handleConfirmPayment = () => {
     if (amountPaid < total) return
     createOrder.mutate({
-      items: cart.map((i) => ({
-        product_id: i.product.id,
-        quantity: i.quantity,
-        unit_price: i.unit_price,
-      })),
+      items: cart.map((i) => ({ product_id: i.product.id, quantity: i.quantity, unit_price: i.unit_price })),
       discount: discountAmount,
       discount_type: discountType,
       total,
@@ -142,64 +149,70 @@ export default function OrdersPage() {
   }
 
   const handleNewOrder = () => {
-    setCart([])
-    setDiscountValue(0)
-    setDiscountType('flat')
-    setShowReceipt(false)
-    setCompletedOrder(null)
-    setAmountPaid(0)
+    setCart([]); setDiscountValue(0); setDiscountType('flat')
+    setShowReceipt(false); setCompletedOrder(null); setAmountPaid(0)
   }
 
-  const handleViewOrder = (order: Order) => {
-    setSelectedOrder(order)
-    setShowOrderDetail(true)
+  const statusColors = (status: string) => {
+    if (status === 'COMPLETED' || status === 'completed') return { bg: SUCCESS_DIM, color: SUCCESS }
+    if (status === 'VOIDED' || status === 'cancelled') return { bg: DANGER_DIM, color: DANGER }
+    return { bg: ACCENT_DIM, color: ACCENT }
   }
 
   return (
-    <div className="h-full flex flex-col bg-slate-50">
-      {/* Header */}
-      <div className="bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between">
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 0, height: '100%', minHeight: 0 }}>
+
+      {/* ── Header ── */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
         <div>
-          <h1 className="text-xl font-semibold text-slate-800">Orders</h1>
-          <p className="text-sm text-slate-500 mt-0.5">Point of Sale &amp; Order History</p>
+          <h1 style={{ color: TEXT_PRIMARY, fontSize: 22, fontWeight: 700, margin: 0 }}>Orders</h1>
+          <p style={{ color: TEXT_MUTED, fontSize: 13, marginTop: 4 }}>Point of Sale &amp; Order History</p>
         </div>
-        <div className="flex gap-2">
-          <button
-            onClick={() => setActiveTab('pos')}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-              activeTab === 'pos'
-                ? 'bg-amber-500 text-white'
-                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-            }`}
-          >
-            POS
-          </button>
-          <button
-            onClick={() => setActiveTab('history')}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-              activeTab === 'history'
-                ? 'bg-amber-500 text-white'
-                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-            }`}
-          >
-            Order History
-          </button>
+        <div style={{ display: 'flex', gap: 8 }}>
+          {(['pos', 'history'] as ActiveTab[]).map((tab) => (
+            <button
+              key={tab}
+              onClick={() => setActiveTab(tab)}
+              style={{
+                padding: '8px 20px',
+                borderRadius: 8,
+                fontSize: 13,
+                fontWeight: 600,
+                border: 'none',
+                cursor: 'pointer',
+                background: activeTab === tab ? ACCENT : BG_CARD,
+                color: activeTab === tab ? '#fff' : TEXT_SECONDARY,
+                transition: 'all 0.15s',
+              }}
+            >
+              {tab === 'pos' ? 'POS' : 'Order History'}
+            </button>
+          ))}
         </div>
       </div>
 
-      {/* POS Tab */}
+      {/* ── POS Tab ── */}
       {activeTab === 'pos' && (
-        <div className="flex flex-1 overflow-hidden">
-          {/* Product Panel */}
-          <div className="flex-1 flex flex-col overflow-hidden p-4 gap-4">
+        <div style={{ display: 'flex', gap: 16, flex: 1, minHeight: 0, overflow: 'hidden' }}>
+
+          {/* Product Grid */}
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 12, minHeight: 0 }}>
             <input
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search products by name or SKU..."
-              className="w-full border border-slate-300 rounded-lg px-4 py-2.5 text-sm focus:border-amber-500 focus:outline-none"
+              placeholder="Search products by name or SKU…"
+              style={{
+                background: BG_CARD, border: `1px solid ${BORDER}`, borderRadius: 8,
+                padding: '10px 14px', color: TEXT_PRIMARY, fontSize: 13,
+                outline: 'none', flexShrink: 0,
+              }}
             />
-            <div className="flex-1 overflow-y-auto grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 content-start">
+            <div style={{
+              flex: 1, overflowY: 'auto',
+              display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))',
+              gap: 12, alignContent: 'start',
+            }}>
               {products.map((product) => {
                 const stock = product.stock_levels?.quantity ?? 0
                 const outOfStock = stock <= 0
@@ -208,31 +221,26 @@ export default function OrdersPage() {
                     key={product.id}
                     onClick={() => !outOfStock && addToCart(product)}
                     disabled={outOfStock}
-                    className={`bg-white border rounded-xl p-4 text-left transition-all ${
-                      outOfStock
-                        ? 'border-slate-200 opacity-50 cursor-not-allowed'
-                        : 'border-slate-200 hover:border-amber-400 hover:shadow-md cursor-pointer'
-                    }`}
+                    style={{
+                      ...card({ padding: 16, textAlign: 'left', cursor: outOfStock ? 'not-allowed' : 'pointer', opacity: outOfStock ? 0.45 : 1, transition: 'border-color 0.15s, box-shadow 0.15s' }),
+                      background: BG_CARD,
+                    }}
+                    onMouseEnter={(e) => { if (!outOfStock) (e.currentTarget.style.borderColor = ACCENT) }}
+                    onMouseLeave={(e) => { (e.currentTarget.style.borderColor = BORDER) }}
                   >
-                    <div className="text-xs text-slate-400 mb-1">
+                    <div style={{ fontSize: 11, color: TEXT_MUTED, marginBottom: 4 }}>
                       {product.categories?.name ?? 'Uncategorized'}
                     </div>
-                    <div className="font-medium text-slate-800 text-sm leading-tight mb-2">
+                    <div style={{ fontSize: 13, fontWeight: 600, color: TEXT_PRIMARY, lineHeight: 1.3, marginBottom: 10 }}>
                       {product.name}
                     </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-amber-600 font-semibold text-sm">
-                        ₱{product.price.toFixed(2)}
-                      </span>
-                      <span
-                        className={`text-xs px-2 py-0.5 rounded-full ${
-                          outOfStock
-                            ? 'bg-red-100 text-red-600'
-                            : stock <= 5
-                            ? 'bg-amber-100 text-amber-700'
-                            : 'bg-green-100 text-green-700'
-                        }`}
-                      >
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <span style={{ color: ACCENT, fontWeight: 700, fontSize: 13 }}>{peso(product.price)}</span>
+                      <span style={{
+                        fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 20,
+                        background: outOfStock ? DANGER_DIM : stock <= 5 ? ACCENT_DIM : SUCCESS_DIM,
+                        color: outOfStock ? DANGER : stock <= 5 ? ACCENT : SUCCESS,
+                      }}>
                         {outOfStock ? 'Out' : `${stock} left`}
                       </span>
                     </div>
@@ -240,110 +248,90 @@ export default function OrdersPage() {
                 )
               })}
               {products.length === 0 && (
-                <div className="col-span-full flex flex-col items-center justify-center py-16 text-slate-400">
-                  <span className="text-4xl mb-3">📦</span>
-                  <p className="text-sm">No products found</p>
+                <div style={{ gridColumn: '1/-1', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '60px 0', color: TEXT_MUTED }}>
+                  <span style={{ fontSize: 36, marginBottom: 10 }}>📦</span>
+                  <p style={{ fontSize: 13 }}>No products found</p>
                 </div>
               )}
             </div>
           </div>
 
           {/* Cart Panel */}
-          <div className="w-80 bg-white border-l border-slate-200 flex flex-col">
-            <div className="px-4 py-3 border-b border-slate-100">
-              <h2 className="font-semibold text-slate-700">Cart</h2>
-              <p className="text-xs text-slate-400">{cart.length} item(s)</p>
+          <div style={{ ...card({ display: 'flex', flexDirection: 'column', width: 300, flexShrink: 0, overflow: 'hidden', padding: 0 }) }}>
+            <div style={{ padding: '16px 20px', borderBottom: `1px solid ${BORDER}` }}>
+              <div style={{ color: TEXT_PRIMARY, fontSize: 14, fontWeight: 600 }}>Cart</div>
+              <div style={{ color: TEXT_MUTED, fontSize: 12, marginTop: 2 }}>{cart.length} item(s)</div>
             </div>
 
-            {/* Cart Items */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-3">
+            {/* Items */}
+            <div style={{ flex: 1, overflowY: 'auto', padding: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
               {cart.length === 0 && (
-                <div className="flex flex-col items-center justify-center h-40 text-slate-300">
-                  <span className="text-4xl mb-2">🛒</span>
-                  <p className="text-sm">Cart is empty</p>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: 140, color: TEXT_MUTED }}>
+                  <span style={{ fontSize: 32, marginBottom: 8 }}>🛒</span>
+                  <p style={{ fontSize: 12 }}>Cart is empty</p>
                 </div>
               )}
               {cart.map((item) => (
-                <div key={item.product.id} className="bg-slate-50 rounded-lg p-3">
-                  <div className="flex justify-between items-start mb-2">
-                    <span className="text-sm font-medium text-slate-700 leading-tight flex-1 pr-2">
+                <div key={item.product.id} style={{ background: BG_BASE, borderRadius: 8, padding: 12 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
+                    <span style={{ fontSize: 12, fontWeight: 600, color: TEXT_PRIMARY, flex: 1, paddingRight: 8, lineHeight: 1.3 }}>
                       {item.product.name}
                     </span>
-                    <button
-                      onClick={() => removeFromCart(item.product.id)}
-                      className="text-slate-300 hover:text-red-400 text-lg leading-none"
-                    >
+                    <button onClick={() => removeFromCart(item.product.id)}
+                      style={{ background: 'none', border: 'none', color: TEXT_MUTED, fontSize: 16, cursor: 'pointer', lineHeight: 1 }}>
                       ×
                     </button>
                   </div>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => updateQty(item.product.id, item.quantity - 1)}
-                        className="w-6 h-6 rounded bg-slate-200 text-slate-600 text-sm hover:bg-slate-300 flex items-center justify-center"
-                      >
-                        −
-                      </button>
-                      <span className="text-sm font-medium w-6 text-center">{item.quantity}</span>
-                      <button
-                        onClick={() => updateQty(item.product.id, item.quantity + 1)}
-                        className="w-6 h-6 rounded bg-slate-200 text-slate-600 text-sm hover:bg-slate-300 flex items-center justify-center"
-                      >
-                        +
-                      </button>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      {[-1, null, 1].map((delta, idx) =>
+                        delta === null ? (
+                          <span key="qty" style={{ fontSize: 13, fontWeight: 600, color: TEXT_PRIMARY, width: 20, textAlign: 'center' }}>{item.quantity}</span>
+                        ) : (
+                          <button key={idx} onClick={() => updateQty(item.product.id, item.quantity + delta!)}
+                            style={{ width: 24, height: 24, borderRadius: 6, border: `1px solid ${BORDER}`, background: BG_CARD, color: TEXT_SECONDARY, fontSize: 14, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            {delta === -1 ? '−' : '+'}
+                          </button>
+                        )
+                      )}
                     </div>
-                    <span className="text-sm font-semibold text-amber-600">
-                      ₱{(item.unit_price * item.quantity).toFixed(2)}
-                    </span>
+                    <span style={{ fontSize: 13, fontWeight: 700, color: ACCENT }}>{peso(item.unit_price * item.quantity)}</span>
                   </div>
                 </div>
               ))}
             </div>
 
             {/* Discount + Totals */}
-            <div className="border-t border-slate-100 p-4 space-y-3">
+            <div style={{ borderTop: `1px solid ${BORDER}`, padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
               <div>
-                <label className="text-xs font-medium text-slate-500 block mb-1">Discount</label>
-                <div className="flex gap-2">
-                  <select
-                    value={discountType}
-                    onChange={(e) => setDiscountType(e.target.value as DiscountType)}
-                    className="border border-slate-300 rounded-lg px-2 py-1.5 text-sm focus:border-amber-500 focus:outline-none"
-                  >
+                <div style={labelStyle}>Discount</div>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <select value={discountType} onChange={(e) => setDiscountType(e.target.value as DiscountType)}
+                    style={{ background: BG_BASE, border: `1px solid ${BORDER}`, borderRadius: 8, padding: '8px 10px', color: TEXT_PRIMARY, fontSize: 12, outline: 'none' }}>
                     <option value="flat">₱ Flat</option>
                     <option value="percentage">% Off</option>
                   </select>
-                  <input
-                    type="number"
-                    min={0}
-                    value={discountValue}
+                  <input type="number" min={0} value={discountValue}
                     onChange={(e) => setDiscountValue(Number(e.target.value))}
-                    className="flex-1 border border-slate-300 rounded-lg px-3 py-1.5 text-sm focus:border-amber-500 focus:outline-none"
-                    placeholder="0"
-                  />
+                    style={{ flex: 1, background: BG_BASE, border: `1px solid ${BORDER}`, borderRadius: 8, padding: '8px 12px', color: TEXT_PRIMARY, fontSize: 13, outline: 'none' }}
+                    placeholder="0" />
                 </div>
               </div>
-              <div className="space-y-1 text-sm">
-                <div className="flex justify-between text-slate-500">
-                  <span>Subtotal</span>
-                  <span>₱{subtotal.toFixed(2)}</span>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', color: TEXT_MUTED }}>
+                  <span>Subtotal</span><span>{peso(subtotal)}</span>
                 </div>
                 {discountAmount > 0 && (
-                  <div className="flex justify-between text-green-600">
-                    <span>Discount</span>
-                    <span>−₱{discountAmount.toFixed(2)}</span>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', color: SUCCESS }}>
+                    <span>Discount</span><span>−{peso(discountAmount)}</span>
                   </div>
                 )}
-                <div className="flex justify-between font-semibold text-slate-800 text-base pt-1 border-t border-slate-100">
-                  <span>Total</span>
-                  <span className="text-amber-600">₱{total.toFixed(2)}</span>
+                <div style={{ display: 'flex', justifyContent: 'space-between', color: TEXT_PRIMARY, fontWeight: 700, fontSize: 15, paddingTop: 8, borderTop: `1px solid ${BORDER}` }}>
+                  <span>Total</span><span style={{ color: ACCENT }}>{peso(total)}</span>
                 </div>
               </div>
-              <button
-                onClick={handleCheckout}
-                disabled={cart.length === 0}
-                className="w-full bg-amber-500 hover:bg-amber-600 disabled:opacity-40 disabled:cursor-not-allowed text-white font-semibold py-2.5 rounded-lg transition-colors text-sm"
-              >
+              <button onClick={handleCheckout} disabled={cart.length === 0}
+                style={{ background: cart.length === 0 ? BORDER : ACCENT, color: cart.length === 0 ? TEXT_MUTED : '#fff', border: 'none', borderRadius: 8, padding: '12px', fontSize: 13, fontWeight: 700, cursor: cart.length === 0 ? 'not-allowed' : 'pointer', transition: 'background 0.15s' }}>
                 Proceed to Payment
               </button>
             </div>
@@ -351,193 +339,152 @@ export default function OrdersPage() {
         </div>
       )}
 
-      {/* Order History Tab */}
+      {/* ── Order History Tab ── */}
       {activeTab === 'history' && (
-        <div className="flex-1 overflow-auto p-6">
-          <div className="max-w-5xl mx-auto">
-            <div className="mb-4">
-              <input
-                type="text"
-                value={historySearch}
-                onChange={(e) => setHistorySearch(e.target.value)}
-                placeholder="Search orders..."
-                className="w-full max-w-sm border border-slate-300 rounded-lg px-4 py-2.5 text-sm focus:border-amber-500 focus:outline-none"
-              />
-            </div>
-            <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="bg-slate-50 border-b border-slate-200">
-                    <th className="text-left px-4 py-3 font-medium text-slate-600">Order ID</th>
-                    <th className="text-left px-4 py-3 font-medium text-slate-600">Date</th>
-                    <th className="text-left px-4 py-3 font-medium text-slate-600">Total</th>
-                    <th className="text-left px-4 py-3 font-medium text-slate-600">Status</th>
-                    <th className="text-left px-4 py-3 font-medium text-slate-600">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {orders.map((order) => (
-                    <tr key={order.id} className="hover:bg-slate-50 transition-colors">
-                      <td className="px-4 py-3 font-mono text-xs text-slate-500">
+        <div style={{ flex: 1, overflowY: 'auto' }}>
+          <div style={{ marginBottom: 16 }}>
+            <input type="text" value={historySearch} onChange={(e) => setHistorySearch(e.target.value)}
+              placeholder="Search orders…"
+              style={{ background: BG_CARD, border: `1px solid ${BORDER}`, borderRadius: 8, padding: '10px 14px', color: TEXT_PRIMARY, fontSize: 13, outline: 'none', width: 280 }} />
+          </div>
+          <div style={card({ overflow: 'hidden', padding: 0 })}>
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <thead>
+                <tr style={{ background: BG_BASE }}>
+                  {['Order ID', 'Date', 'Cashier', 'Total', 'Status', ''].map((h) => (
+                    <th key={h} style={{ padding: '12px 20px', textAlign: 'left', fontSize: 11, fontWeight: 700, color: TEXT_MUTED, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {orders.map((order) => {
+                  const sc = statusColors(order.status)
+                  return (
+                    <tr key={order.id} style={{ borderTop: `1px solid ${BORDER}` }}>
+                      <td style={{ padding: '14px 20px', fontFamily: 'monospace', fontSize: 12, color: TEXT_SECONDARY }}>
                         #{order.id.slice(-8).toUpperCase()}
                       </td>
-                      <td className="px-4 py-3 text-slate-600">
-                        {new Date(order.created_at).toLocaleString()}
+                      <td style={{ padding: '14px 20px', color: TEXT_SECONDARY, fontSize: 13 }}>
+                        {new Date(order.created_at).toLocaleString('en-PH')}
                       </td>
-                      <td className="px-4 py-3 font-semibold text-amber-600">
-                        ₱{order.total.toFixed(2)}
+                      <td style={{ padding: '14px 20px', color: TEXT_SECONDARY, fontSize: 13 }}>
+                        {order.cashier?.name ?? '—'}
                       </td>
-                      <td className="px-4 py-3">
-                        <span
-                          className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-                            order.status === 'completed'
-                              ? 'bg-green-100 text-green-700'
-                              : order.status === 'cancelled'
-                              ? 'bg-red-100 text-red-600'
-                              : 'bg-amber-100 text-amber-700'
-                          }`}
-                        >
+                      <td style={{ padding: '14px 20px', color: ACCENT, fontSize: 13, fontWeight: 700 }}>
+                        {peso(order.total)}
+                      </td>
+                      <td style={{ padding: '14px 20px' }}>
+                        <span style={{ fontSize: 10, fontWeight: 700, padding: '3px 10px', borderRadius: 20, background: sc.bg, color: sc.color }}>
                           {order.status}
                         </span>
                       </td>
-                      <td className="px-4 py-3">
-                        <button
-                          onClick={() => handleViewOrder(order)}
-                          className="text-amber-600 hover:text-amber-700 text-sm font-medium"
-                        >
-                          View
+                      <td style={{ padding: '14px 20px' }}>
+                        <button onClick={() => { setSelectedOrder(order); setShowOrderDetail(true) }}
+                          style={{ background: 'none', border: 'none', color: ACCENT, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
+                          View →
                         </button>
                       </td>
                     </tr>
-                  ))}
-                  {orders.length === 0 && (
-                    <tr>
-                      <td colSpan={5} className="px-4 py-12 text-center text-slate-400 text-sm">
-                        No orders found
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
+                  )
+                })}
+                {orders.length === 0 && (
+                  <tr>
+                    <td colSpan={6} style={{ padding: '48px', textAlign: 'center', color: TEXT_MUTED, fontSize: 13 }}>
+                      No orders found
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
           </div>
         </div>
       )}
 
-      {/* Payment Modal */}
+      {/* ── Payment Modal ── */}
       {showPayment && (
-        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6">
-            <h2 className="text-lg font-semibold text-slate-800 mb-4">Payment</h2>
-            <div className="space-y-3 mb-6">
-              <div className="flex justify-between text-sm text-slate-600">
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 50, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+          <div style={{ ...card({ padding: 28, width: '100%', maxWidth: 380 }) }}>
+            <h2 style={{ color: TEXT_PRIMARY, fontSize: 18, fontWeight: 700, margin: '0 0 20px' }}>Payment</h2>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 14, marginBottom: 24 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: TEXT_SECONDARY }}>
                 <span>Total Amount</span>
-                <span className="font-bold text-slate-800 text-base">₱{total.toFixed(2)}</span>
+                <span style={{ fontWeight: 800, color: TEXT_PRIMARY, fontSize: 18 }}>{peso(total)}</span>
               </div>
               <div>
-                <label className="text-sm font-medium text-slate-600 block mb-1">
-                  Amount Paid
-                </label>
-                <input
-                  type="number"
-                  min={0}
-                  value={amountPaid || ''}
-                  onChange={(e) => setAmountPaid(Number(e.target.value))}
+                <div style={labelStyle}>Amount Paid</div>
+                <input type="number" min={0} value={amountPaid || ''} onChange={(e) => setAmountPaid(Number(e.target.value))}
                   placeholder="Enter amount"
-                  className="w-full border border-slate-300 rounded-lg px-4 py-2.5 text-sm focus:border-amber-500 focus:outline-none text-right text-lg font-semibold"
-                  autoFocus
-                />
+                  style={{ width: '100%', background: BG_BASE, border: `1px solid ${BORDER}`, borderRadius: 8, padding: '12px 16px', color: TEXT_PRIMARY, fontSize: 20, fontWeight: 700, textAlign: 'right', outline: 'none', boxSizing: 'border-box' }}
+                  autoFocus />
               </div>
-              {amountPaid >= total && (
-                <div className="bg-green-50 border border-green-200 rounded-lg px-4 py-3 flex justify-between items-center">
-                  <span className="text-sm text-green-700">Change</span>
-                  <span className="font-bold text-green-700 text-lg">₱{change.toFixed(2)}</span>
+              {amountPaid >= total && amountPaid > 0 && (
+                <div style={{ background: SUCCESS_DIM, border: `1px solid rgba(52,211,153,0.3)`, borderRadius: 8, padding: '12px 16px', display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ color: SUCCESS, fontSize: 13 }}>Change</span>
+                  <span style={{ color: SUCCESS, fontWeight: 800, fontSize: 18 }}>{peso(change)}</span>
                 </div>
               )}
               {amountPaid > 0 && amountPaid < total && (
-                <div className="bg-red-50 border border-red-200 rounded-lg px-4 py-3">
-                  <p className="text-sm text-red-600">
-                    Insufficient — need ₱{(total - amountPaid).toFixed(2)} more
-                  </p>
+                <div style={{ background: DANGER_DIM, border: `1px solid rgba(248,113,113,0.3)`, borderRadius: 8, padding: '12px 16px' }}>
+                  <p style={{ color: DANGER, fontSize: 13, margin: 0 }}>Insufficient — need {peso(total - amountPaid)} more</p>
                 </div>
               )}
             </div>
-            <div className="flex gap-3">
-              <button
-                onClick={() => setShowPayment(false)}
-                className="flex-1 border border-slate-300 text-slate-600 rounded-lg py-2.5 text-sm hover:bg-slate-50"
-              >
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button onClick={() => setShowPayment(false)}
+                style={{ flex: 1, background: 'none', border: `1px solid ${BORDER}`, borderRadius: 8, padding: '12px', color: TEXT_SECONDARY, fontSize: 13, cursor: 'pointer' }}>
                 Cancel
               </button>
-              <button
-                onClick={handleConfirmPayment}
-                disabled={amountPaid < total || createOrder.isPending}
-                className="flex-1 bg-amber-500 hover:bg-amber-600 disabled:opacity-40 text-white font-semibold rounded-lg py-2.5 text-sm transition-colors"
-              >
-                {createOrder.isPending ? 'Processing...' : 'Confirm'}
+              <button onClick={handleConfirmPayment} disabled={amountPaid < total || createOrder.isPending}
+                style={{ flex: 1, background: amountPaid < total ? BORDER : ACCENT, border: 'none', borderRadius: 8, padding: '12px', color: '#fff', fontSize: 13, fontWeight: 700, cursor: amountPaid < total ? 'not-allowed' : 'pointer' }}>
+                {createOrder.isPending ? 'Processing…' : 'Confirm Payment'}
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Receipt Modal */}
+      {/* ── Receipt Modal ── */}
       {showReceipt && completedOrder && (
-        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6">
-            <div className="text-center mb-4">
-              <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-2">
-                <span className="text-2xl">✓</span>
-              </div>
-              <h2 className="text-lg font-semibold text-slate-800">Payment Received</h2>
-              <p className="text-xs text-slate-400 font-mono mt-1">
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 50, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+          <div style={{ ...card({ padding: 28, width: '100%', maxWidth: 380 }) }}>
+            <div style={{ textAlign: 'center', marginBottom: 20 }}>
+              <div style={{ width: 52, height: 52, borderRadius: '50%', background: SUCCESS_DIM, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 10px', fontSize: 24 }}>✓</div>
+              <h2 style={{ color: TEXT_PRIMARY, fontSize: 18, fontWeight: 700, margin: 0 }}>Payment Received</h2>
+              <p style={{ color: TEXT_MUTED, fontSize: 11, fontFamily: 'monospace', marginTop: 4 }}>
                 #{completedOrder.id.slice(-8).toUpperCase()}
               </p>
             </div>
-
-            <div className="border-t border-dashed border-slate-200 py-4 space-y-2">
+            <div style={{ borderTop: `1px dashed ${BORDER}`, padding: '16px 0', display: 'flex', flexDirection: 'column', gap: 6 }}>
               {completedOrder.order_items?.map((item, i) => (
-                <div key={i} className="flex justify-between text-sm text-slate-600">
-                  <span>
-                    {item.product.name} × {item.quantity}
-                  </span>
-                  <span>₱{(item.unit_price * item.quantity).toFixed(2)}</span>
+                <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: TEXT_SECONDARY }}>
+                  <span>{item.product.name} × {item.quantity}</span>
+                  <span>{peso(item.unit_price * item.quantity)}</span>
                 </div>
               ))}
             </div>
-
-            <div className="border-t border-dashed border-slate-200 pt-3 space-y-1 text-sm">
+            <div style={{ borderTop: `1px dashed ${BORDER}`, paddingTop: 14, display: 'flex', flexDirection: 'column', gap: 6 }}>
               {completedOrder.discount > 0 && (
-                <div className="flex justify-between text-green-600">
-                  <span>Discount</span>
-                  <span>−₱{completedOrder.discount.toFixed(2)}</span>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: SUCCESS }}>
+                  <span>Discount</span><span>−{peso(completedOrder.discount)}</span>
                 </div>
               )}
-              <div className="flex justify-between font-bold text-slate-800 text-base">
-                <span>Total</span>
-                <span>₱{completedOrder.total.toFixed(2)}</span>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 16, fontWeight: 800, color: TEXT_PRIMARY }}>
+                <span>Total</span><span>{peso(completedOrder.total)}</span>
               </div>
-              <div className="flex justify-between text-slate-500">
-                <span>Paid</span>
-                <span>₱{amountPaid.toFixed(2)}</span>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: TEXT_SECONDARY }}>
+                <span>Paid</span><span>{peso(amountPaid)}</span>
               </div>
-              <div className="flex justify-between font-semibold text-green-600">
-                <span>Change</span>
-                <span>₱{(amountPaid - completedOrder.total).toFixed(2)}</span>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, fontWeight: 700, color: SUCCESS }}>
+                <span>Change</span><span>{peso(amountPaid - completedOrder.total)}</span>
               </div>
             </div>
-
-            <div className="mt-4 pt-3 border-t border-slate-100 flex gap-3">
-              <button
-                onClick={() => window.print()}
-                className="flex-1 border border-slate-300 text-slate-600 rounded-lg py-2.5 text-sm hover:bg-slate-50"
-              >
+            <div style={{ display: 'flex', gap: 10, marginTop: 20, paddingTop: 16, borderTop: `1px solid ${BORDER}` }}>
+              <button onClick={() => window.print()}
+                style={{ flex: 1, background: 'none', border: `1px solid ${BORDER}`, borderRadius: 8, padding: '12px', color: TEXT_SECONDARY, fontSize: 13, cursor: 'pointer' }}>
                 Print
               </button>
-              <button
-                onClick={handleNewOrder}
-                className="flex-1 bg-amber-500 hover:bg-amber-600 text-white font-semibold rounded-lg py-2.5 text-sm transition-colors"
-              >
+              <button onClick={handleNewOrder}
+                style={{ flex: 1, background: ACCENT, border: 'none', borderRadius: 8, padding: '12px', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>
                 New Order
               </button>
             </div>
@@ -545,69 +492,62 @@ export default function OrdersPage() {
         </div>
       )}
 
-      {/* Order Detail Modal */}
+      {/* ── Order Detail Modal ── */}
       {showOrderDetail && selectedOrder && (
-        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6">
-            <div className="flex justify-between items-start mb-4">
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 50, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+          <div style={{ ...card({ padding: 28, width: '100%', maxWidth: 420 }) }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 }}>
               <div>
-                <h2 className="text-lg font-semibold text-slate-800">Order Detail</h2>
-                <p className="text-xs text-slate-400 font-mono">
+                <h2 style={{ color: TEXT_PRIMARY, fontSize: 18, fontWeight: 700, margin: 0 }}>Order Detail</h2>
+                <p style={{ color: TEXT_MUTED, fontSize: 11, fontFamily: 'monospace', marginTop: 4 }}>
                   #{selectedOrder.id.slice(-8).toUpperCase()}
                 </p>
               </div>
-              <button
-                onClick={() => setShowOrderDetail(false)}
-                className="text-slate-400 hover:text-slate-600 text-xl"
-              >
-                ×
-              </button>
+              <button onClick={() => setShowOrderDetail(false)}
+                style={{ background: 'none', border: 'none', color: TEXT_MUTED, fontSize: 20, cursor: 'pointer' }}>×</button>
             </div>
-            <div className="space-y-2 text-sm border-t border-slate-100 pt-4">
-              <div className="flex justify-between text-slate-500">
-                <span>Date</span>
-                <span>{new Date(selectedOrder.created_at).toLocaleString()}</span>
-              </div>
-              <div className="flex justify-between text-slate-500">
-                <span>Status</span>
-                <span
-                  className={`font-medium ${
-                    selectedOrder.status === 'completed' ? 'text-green-600' : 'text-red-500'
-                  }`}
-                >
+            <div style={{ borderTop: `1px solid ${BORDER}`, paddingTop: 16, display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {[
+                { label: 'Date', value: new Date(selectedOrder.created_at).toLocaleString('en-PH') },
+                { label: 'Cashier', value: selectedOrder.cashier?.name ?? '—' },
+              ].map(({ label, value }) => (
+                <div key={label} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
+                  <span style={{ color: TEXT_MUTED }}>{label}</span>
+                  <span style={{ color: TEXT_SECONDARY }}>{value}</span>
+                </div>
+              ))}
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
+                <span style={{ color: TEXT_MUTED }}>Status</span>
+                <span style={{ ...statusColors(selectedOrder.status), fontWeight: 700, padding: '2px 10px', borderRadius: 20, fontSize: 11 }}>
                   {selectedOrder.status}
                 </span>
               </div>
             </div>
             {selectedOrder.order_items && selectedOrder.order_items.length > 0 && (
-              <div className="mt-4 border-t border-slate-100 pt-4 space-y-2">
-                <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">Items</p>
-                {selectedOrder.order_items.map((item, i) => (
-                  <div key={i} className="flex justify-between text-sm text-slate-700">
-                    <span>
-                      {item.product.name} × {item.quantity}
-                    </span>
-                    <span>₱{(item.unit_price * item.quantity).toFixed(2)}</span>
-                  </div>
-                ))}
+              <div style={{ marginTop: 16, paddingTop: 16, borderTop: `1px solid ${BORDER}` }}>
+                <div style={labelStyle}>Items</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 8 }}>
+                  {selectedOrder.order_items.map((item, i) => (
+                    <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: TEXT_SECONDARY }}>
+                      <span>{item.product.name} × {item.quantity}</span>
+                      <span>{peso(item.unit_price * item.quantity)}</span>
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
-            <div className="mt-4 border-t border-slate-100 pt-4 space-y-1 text-sm">
+            <div style={{ marginTop: 16, paddingTop: 14, borderTop: `1px solid ${BORDER}`, display: 'flex', flexDirection: 'column', gap: 6 }}>
               {selectedOrder.discount > 0 && (
-                <div className="flex justify-between text-green-600">
-                  <span>Discount</span>
-                  <span>−₱{selectedOrder.discount.toFixed(2)}</span>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: SUCCESS }}>
+                  <span>Discount</span><span>−{peso(selectedOrder.discount)}</span>
                 </div>
               )}
-              <div className="flex justify-between font-bold text-slate-800 text-base">
-                <span>Total</span>
-                <span>₱{selectedOrder.total.toFixed(2)}</span>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 16, fontWeight: 800, color: TEXT_PRIMARY }}>
+                <span>Total</span><span style={{ color: ACCENT }}>{peso(selectedOrder.total)}</span>
               </div>
             </div>
-            <button
-              onClick={() => setShowOrderDetail(false)}
-              className="mt-5 w-full bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg py-2.5 text-sm font-medium"
-            >
+            <button onClick={() => setShowOrderDetail(false)}
+              style={{ marginTop: 20, width: '100%', background: BG_BASE, border: `1px solid ${BORDER}`, borderRadius: 8, padding: '12px', color: TEXT_SECONDARY, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
               Close
             </button>
           </div>

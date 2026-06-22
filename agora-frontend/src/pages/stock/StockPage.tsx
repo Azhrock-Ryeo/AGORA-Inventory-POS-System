@@ -2,17 +2,56 @@ import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import api from '../../services/api'
 
+// ── design tokens ────────────────────────────────────────────────────────────
+const BG_BASE = '#0f172a'
+const BG_CARD = '#1e293b'
+const BORDER = '#334155'
+const TEXT_PRIMARY = '#f1f5f9'
+const TEXT_SECONDARY = '#94a3b8'
+const TEXT_MUTED = '#475569'
+const ACCENT = '#f59e0b'
+const SUCCESS = '#34d399'
+const SUCCESS_DIM = 'rgba(52,211,153,0.12)'
+const DANGER = '#f87171'
+const DANGER_DIM = 'rgba(248,113,113,0.12)'
+const WARN = '#fbbf24'
+const WARN_DIM = 'rgba(251,191,36,0.12)'
+
+const card = (extra?: React.CSSProperties): React.CSSProperties => ({
+  background: BG_CARD,
+  border: `1px solid ${BORDER}`,
+  borderRadius: '12px',
+  ...extra,
+})
+
+const labelStyle: React.CSSProperties = {
+  fontSize: '11px',
+  fontWeight: 700,
+  letterSpacing: '0.08em',
+  textTransform: 'uppercase',
+  color: TEXT_MUTED,
+  marginBottom: '6px',
+  display: 'block',
+}
+
+const inputStyle: React.CSSProperties = {
+  background: BG_BASE,
+  border: `1px solid ${BORDER}`,
+  borderRadius: 8,
+  padding: '10px 14px',
+  color: TEXT_PRIMARY,
+  fontSize: 13,
+  outline: 'none',
+  width: '100%',
+  boxSizing: 'border-box' as const,
+}
+
 interface StockLevel {
   id: string
   product_id: string
   quantity: number
   low_stock_threshold: number
-  products: {
-    id: string
-    name: string
-    sku: string
-    categories?: { name: string }
-  }
+  products: { id: string; name: string; sku: string; categories?: { name: string } }
 }
 
 interface StockMovement {
@@ -26,11 +65,7 @@ interface StockMovement {
   products?: { name: string; sku: string }
 }
 
-interface Product {
-  id: string
-  name: string
-  sku: string
-}
+interface Product { id: string; name: string; sku: string }
 
 type ActiveTab = 'levels' | 'in' | 'out' | 'history'
 
@@ -38,51 +73,45 @@ export default function StockPage() {
   const queryClient = useQueryClient()
   const [activeTab, setActiveTab] = useState<ActiveTab>('levels')
 
-  // Stock Levels state
   const [levelsSearch, setLevelsSearch] = useState('')
   const [showLowStockOnly, setShowLowStockOnly] = useState(false)
 
-  // Stock In state
   const [inProductId, setInProductId] = useState('')
   const [inQuantity, setInQuantity] = useState<number>(0)
   const [inReason, setInReason] = useState('')
   const [inError, setInError] = useState('')
   const [inSuccess, setInSuccess] = useState(false)
 
-  // Stock Out state
   const [outProductId, setOutProductId] = useState('')
   const [outQuantity, setOutQuantity] = useState<number>(0)
   const [outReason, setOutReason] = useState('')
   const [outError, setOutError] = useState('')
   const [outSuccess, setOutSuccess] = useState(false)
 
-  // History state
   const [historySearch, setHistorySearch] = useState('')
   const [historyType, setHistoryType] = useState<'all' | 'in' | 'out'>('all')
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
 
-  // Fetch stock levels
   const { data: stockLevels = [], isLoading: levelsLoading } = useQuery<StockLevel[]>({
     queryKey: ['stock-levels', levelsSearch, showLowStockOnly],
     queryFn: async () => {
       const res = await api.get('/stock/levels', {
         params: { search: levelsSearch, low_stock: showLowStockOnly || undefined },
       })
-      return res.data
+      const raw = res.data?.data ?? res.data ?? []
+      return Array.isArray(raw) ? raw : []
     },
   })
 
-  // Fetch all products for dropdowns
   const { data: products = [] } = useQuery<Product[]>({
     queryKey: ['products-dropdown'],
     queryFn: async () => {
       const res = await api.get('/products', { params: { status: 'active', limit: 500 } })
-      return res.data
+      return res.data?.data ?? res.data ?? []
     },
   })
 
-  // Fetch stock movements history
   const { data: movements = [], isLoading: movementsLoading } = useQuery<StockMovement[]>({
     queryKey: ['stock-movements', historySearch, historyType, dateFrom, dateTo],
     queryFn: async () => {
@@ -94,51 +123,32 @@ export default function StockPage() {
           date_to: dateTo || undefined,
         },
       })
-      return res.data
+      const raw = res.data?.data ?? res.data ?? []
+      return Array.isArray(raw) ? raw : []
     },
     enabled: activeTab === 'history',
   })
 
-  // Stock In mutation
   const stockInMutation = useMutation({
-    mutationFn: async (payload: object) => {
-      const res = await api.post('/stock/in', payload)
-      return res.data
-    },
+    mutationFn: async (payload: object) => (await api.post('/stock/in', payload)).data,
     onSuccess: () => {
-      setInSuccess(true)
-      setInProductId('')
-      setInQuantity(0)
-      setInReason('')
-      setInError('')
+      setInSuccess(true); setInProductId(''); setInQuantity(0); setInReason(''); setInError('')
       queryClient.invalidateQueries({ queryKey: ['stock-levels'] })
       queryClient.invalidateQueries({ queryKey: ['stock-movements'] })
       setTimeout(() => setInSuccess(false), 3000)
     },
-    onError: (err: any) => {
-      setInError(err?.response?.data?.message ?? 'Failed to record stock-in')
-    },
+    onError: (err: any) => setInError(err?.response?.data?.message ?? 'Failed to record stock-in'),
   })
 
-  // Stock Out mutation
   const stockOutMutation = useMutation({
-    mutationFn: async (payload: object) => {
-      const res = await api.post('/stock/out', payload)
-      return res.data
-    },
+    mutationFn: async (payload: object) => (await api.post('/stock/out', payload)).data,
     onSuccess: () => {
-      setOutSuccess(true)
-      setOutProductId('')
-      setOutQuantity(0)
-      setOutReason('')
-      setOutError('')
+      setOutSuccess(true); setOutProductId(''); setOutQuantity(0); setOutReason(''); setOutError('')
       queryClient.invalidateQueries({ queryKey: ['stock-levels'] })
       queryClient.invalidateQueries({ queryKey: ['stock-movements'] })
       setTimeout(() => setOutSuccess(false), 3000)
     },
-    onError: (err: any) => {
-      setOutError(err?.response?.data?.message ?? 'Failed to record stock-out')
-    },
+    onError: (err: any) => setOutError(err?.response?.data?.message ?? 'Failed to record stock-out'),
   })
 
   const handleStockIn = () => {
@@ -157,410 +167,307 @@ export default function StockPage() {
     stockOutMutation.mutate({ product_id: outProductId, quantity: outQuantity, reason: outReason })
   }
 
-  const tabs: { key: ActiveTab; label: string }[] = [
+  const TABS: { key: ActiveTab; label: string }[] = [
     { key: 'levels', label: 'Stock Levels' },
     { key: 'in', label: 'Stock In' },
     { key: 'out', label: 'Stock Out' },
     { key: 'history', label: 'Movement History' },
   ]
 
-  const lowStockCount = stockLevels.filter(
-    (s) => s.quantity <= s.low_stock_threshold
-  ).length
+  const lowStockCount = stockLevels.filter((s) => s.quantity <= s.low_stock_threshold).length
+
+  const thStyle: React.CSSProperties = {
+    padding: '12px 20px',
+    textAlign: 'left',
+    fontSize: 11,
+    fontWeight: 700,
+    color: TEXT_MUTED,
+    textTransform: 'uppercase',
+    letterSpacing: '0.06em',
+    background: BG_BASE,
+  }
+
+  const tdStyle: React.CSSProperties = {
+    padding: '14px 20px',
+    fontSize: 13,
+    borderTop: `1px solid ${BORDER}`,
+  }
 
   return (
-    <div className="h-full flex flex-col bg-slate-50">
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+
       {/* Header */}
-      <div className="bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between">
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div>
-          <h1 className="text-xl font-semibold text-slate-800">Stock Management</h1>
-          <p className="text-sm text-slate-500 mt-0.5">Track inventory levels and movements</p>
+          <h1 style={{ color: TEXT_PRIMARY, fontSize: 22, fontWeight: 700, margin: 0 }}>Stock Management</h1>
+          <p style={{ color: TEXT_MUTED, fontSize: 13, marginTop: 4 }}>Track inventory levels and movements</p>
         </div>
         {lowStockCount > 0 && (
-          <div className="flex items-center gap-2 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
-            <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
-            <span className="text-sm text-red-600 font-medium">
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: DANGER_DIM, border: '1px solid rgba(248,113,113,0.3)', borderRadius: 8, padding: '8px 14px' }}>
+            <span style={{ width: 8, height: 8, borderRadius: '50%', background: DANGER, display: 'inline-block' }} />
+            <span style={{ fontSize: 13, color: DANGER, fontWeight: 600 }}>
               {lowStockCount} low stock {lowStockCount === 1 ? 'item' : 'items'}
             </span>
           </div>
         )}
       </div>
 
-      {/* Tabs */}
-      <div className="bg-white border-b border-slate-200 px-6">
-        <div className="flex gap-1">
-          {tabs.map((tab) => (
-            <button
-              key={tab.key}
-              onClick={() => setActiveTab(tab.key)}
-              className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
-                activeTab === tab.key
-                  ? 'border-amber-500 text-amber-600'
-                  : 'border-transparent text-slate-500 hover:text-slate-700'
-              }`}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>
+      {/* Tab bar */}
+      <div style={{ display: 'flex', gap: 4, borderBottom: `1px solid ${BORDER}` }}>
+        {TABS.map((t) => (
+          <button
+            key={t.key}
+            onClick={() => setActiveTab(t.key)}
+            style={{
+              position: 'relative',
+              padding: '10px 18px',
+              fontSize: 13,
+              fontWeight: 600,
+              background: 'none',
+              border: 'none',
+              cursor: 'pointer',
+              color: activeTab === t.key ? ACCENT : TEXT_MUTED,
+              transition: 'color 0.15s',
+            }}
+          >
+            {t.label}
+            {activeTab === t.key && (
+              <span style={{ position: 'absolute', bottom: -1, left: 0, right: 0, height: 2, borderRadius: 2, background: ACCENT }} />
+            )}
+          </button>
+        ))}
       </div>
 
-      <div className="flex-1 overflow-auto p-6">
-        <div className="max-w-5xl mx-auto">
+      {/* ── Stock Levels ── */}
+      {activeTab === 'levels' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <input
+              type="text"
+              value={levelsSearch}
+              onChange={(e) => setLevelsSearch(e.target.value)}
+              placeholder="Search products…"
+              style={{ ...inputStyle, width: 240 }}
+            />
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: TEXT_SECONDARY, cursor: 'pointer' }}>
+              <input
+                type="checkbox"
+                checked={showLowStockOnly}
+                onChange={(e) => setShowLowStockOnly(e.target.checked)}
+                style={{ accentColor: ACCENT }}
+              />
+              Low stock only
+            </label>
+          </div>
 
-          {/* Stock Levels Tab */}
-          {activeTab === 'levels' && (
-            <div className="space-y-4">
-              <div className="flex gap-3 items-center">
-                <input
-                  type="text"
-                  value={levelsSearch}
-                  onChange={(e) => setLevelsSearch(e.target.value)}
-                  placeholder="Search products..."
-                  className="border border-slate-300 rounded-lg px-4 py-2.5 text-sm focus:border-amber-500 focus:outline-none w-64"
-                />
-                <label className="flex items-center gap-2 text-sm text-slate-600 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={showLowStockOnly}
-                    onChange={(e) => setShowLowStockOnly(e.target.checked)}
-                    className="accent-amber-500"
-                  />
-                  Low stock only
-                </label>
-              </div>
-
-              <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
-                {levelsLoading ? (
-                  <div className="py-16 text-center text-slate-400 text-sm">Loading...</div>
-                ) : (
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="bg-slate-50 border-b border-slate-200">
-                        <th className="text-left px-4 py-3 font-medium text-slate-600">Product</th>
-                        <th className="text-left px-4 py-3 font-medium text-slate-600">SKU</th>
-                        <th className="text-left px-4 py-3 font-medium text-slate-600">Category</th>
-                        <th className="text-left px-4 py-3 font-medium text-slate-600">Quantity</th>
-                        <th className="text-left px-4 py-3 font-medium text-slate-600">Threshold</th>
-                        <th className="text-left px-4 py-3 font-medium text-slate-600">Status</th>
+          <div style={card({ overflow: 'hidden', padding: 0 })}>
+            {levelsLoading ? (
+              <div style={{ padding: '48px', textAlign: 'center', color: TEXT_MUTED, fontSize: 13 }}>Loading…</div>
+            ) : (
+              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <thead>
+                  <tr>
+                    {['Product', 'SKU', 'Category', 'Quantity', 'Threshold', 'Status'].map((h) => (
+                      <th key={h} style={thStyle}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {stockLevels.map((level) => {
+                    const prod = (level as any).products ?? (level as any).product ?? {}
+                    const productName = prod.name ?? (level as any).product_name ?? '—'
+                    const productSku  = prod.sku  ?? (level as any).sku ?? '—'
+                    const categoryName = prod.categories?.name ?? prod.category?.name ?? '—'
+                    const isOut = level.quantity === 0
+                    const isLow = !isOut && level.quantity <= level.low_stock_threshold
+                    return (
+                      <tr key={level.id}
+                        onMouseEnter={(e) => (e.currentTarget.style.background = BG_BASE)}
+                        onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}>
+                        <td style={{ ...tdStyle, color: TEXT_PRIMARY, fontWeight: 600 }}>{productName}</td>
+                        <td style={{ ...tdStyle, color: TEXT_SECONDARY, fontFamily: 'monospace', fontSize: 12 }}>{productSku}</td>
+                        <td style={{ ...tdStyle, color: TEXT_SECONDARY }}>{categoryName}</td>
+                        <td style={{ ...tdStyle }}>
+                          <span style={{ fontWeight: 800, fontSize: 16, color: isOut ? DANGER : isLow ? WARN : SUCCESS }}>
+                            {level.quantity}
+                          </span>
+                        </td>
+                        <td style={{ ...tdStyle, color: TEXT_MUTED }}>{level.low_stock_threshold}</td>
+                        <td style={{ ...tdStyle }}>
+                          <span style={{
+                            fontSize: 10, fontWeight: 700, padding: '3px 10px', borderRadius: 20,
+                            background: isOut ? DANGER_DIM : isLow ? WARN_DIM : SUCCESS_DIM,
+                            color: isOut ? DANGER : isLow ? WARN : SUCCESS,
+                          }}>
+                            {isOut ? 'Out of stock' : isLow ? 'Low stock' : 'In stock'}
+                          </span>
+                        </td>
                       </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                      {stockLevels.map((level) => {
-                        const isLow = level.quantity <= level.low_stock_threshold
-                        const isOut = level.quantity === 0
-                        return (
-                          <tr key={level.id} className={`hover:bg-slate-50 ${isLow ? 'bg-red-50/30' : ''}`}>
-                            <td className="px-4 py-3 font-medium text-slate-700">
-                              {level.products.name}
-                            </td>
-                            <td className="px-4 py-3 font-mono text-xs text-slate-500">
-                              {level.products.sku}
-                            </td>
-                            <td className="px-4 py-3 text-slate-500">
-                              {level.products.categories?.name ?? '—'}
-                            </td>
-                            <td className="px-4 py-3">
-                              <span
-                                className={`font-semibold text-base ${
-                                  isOut
-                                    ? 'text-red-600'
-                                    : isLow
-                                    ? 'text-amber-600'
-                                    : 'text-slate-800'
-                                }`}
-                              >
-                                {level.quantity}
-                              </span>
-                            </td>
-                            <td className="px-4 py-3 text-slate-500">{level.low_stock_threshold}</td>
-                            <td className="px-4 py-3">
-                              <span
-                                className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-                                  isOut
-                                    ? 'bg-red-100 text-red-600'
-                                    : isLow
-                                    ? 'bg-amber-100 text-amber-700'
-                                    : 'bg-green-100 text-green-700'
-                                }`}
-                              >
-                                {isOut ? 'Out of stock' : isLow ? 'Low stock' : 'In stock'}
-                              </span>
-                            </td>
-                          </tr>
-                        )
-                      })}
-                      {stockLevels.length === 0 && (
-                        <tr>
-                          <td colSpan={6} className="px-4 py-12 text-center text-slate-400 text-sm">
-                            No products found
-                          </td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* Stock In Tab */}
-          {activeTab === 'in' && (
-            <div className="max-w-lg">
-              <div className="bg-white rounded-xl border border-slate-200 p-6 space-y-5">
-                <div className="flex items-center gap-3 pb-3 border-b border-slate-100">
-                  <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center text-green-600 font-bold">
-                    +
-                  </div>
-                  <div>
-                    <h2 className="font-semibold text-slate-800">Record Stock In</h2>
-                    <p className="text-xs text-slate-400">Add new inventory from a supplier</p>
-                  </div>
-                </div>
-
-                {inSuccess && (
-                  <div className="bg-green-50 border border-green-200 rounded-lg px-4 py-3 text-sm text-green-700">
-                    ✓ Stock-in recorded successfully
-                  </div>
-                )}
-
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">
-                      Product <span className="text-red-400">*</span>
-                    </label>
-                    <select
-                      value={inProductId}
-                      onChange={(e) => setInProductId(e.target.value)}
-                      className="w-full border border-slate-300 rounded-lg px-3 py-2.5 text-sm focus:border-amber-500 focus:outline-none"
-                    >
-                      <option value="">Select product</option>
-                      {products.map((p) => (
-                        <option key={p.id} value={p.id}>
-                          {p.name} — {p.sku}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">
-                      Quantity <span className="text-red-400">*</span>
-                    </label>
-                    <input
-                      type="number"
-                      min={1}
-                      value={inQuantity || ''}
-                      onChange={(e) => setInQuantity(Number(e.target.value))}
-                      placeholder="e.g. 50"
-                      className="w-full border border-slate-300 rounded-lg px-3 py-2.5 text-sm focus:border-amber-500 focus:outline-none"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">
-                      Reason / Source <span className="text-red-400">*</span>
-                    </label>
-                    <textarea
-                      value={inReason}
-                      onChange={(e) => setInReason(e.target.value)}
-                      placeholder="e.g. Delivery from Supplier ABC"
-                      rows={3}
-                      className="w-full border border-slate-300 rounded-lg px-3 py-2.5 text-sm focus:border-amber-500 focus:outline-none resize-none"
-                    />
-                  </div>
-
-                  {inError && (
-                    <p className="text-sm text-red-500">{inError}</p>
+                    )
+                  })}
+                  {stockLevels.length === 0 && (
+                    <tr><td colSpan={6} style={{ padding: '48px', textAlign: 'center', color: TEXT_MUTED, fontSize: 13 }}>No products found</td></tr>
                   )}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </div>
+      )}
 
-                  <button
-                    onClick={handleStockIn}
-                    disabled={stockInMutation.isPending}
-                    className="w-full bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white font-semibold py-2.5 rounded-lg transition-colors text-sm"
-                  >
-                    {stockInMutation.isPending ? 'Recording...' : 'Record Stock In'}
-                  </button>
-                </div>
+      {/* ── Stock In ── */}
+      {activeTab === 'in' && (
+        <div style={{ maxWidth: 480 }}>
+          <div style={card({ padding: 28 })}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, paddingBottom: 20, marginBottom: 20, borderBottom: `1px solid ${BORDER}` }}>
+              <div style={{ width: 40, height: 40, borderRadius: 10, background: SUCCESS_DIM, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, color: SUCCESS, fontWeight: 800 }}>+</div>
+              <div>
+                <div style={{ color: TEXT_PRIMARY, fontSize: 15, fontWeight: 700 }}>Record Stock In</div>
+                <div style={{ color: TEXT_MUTED, fontSize: 12, marginTop: 2 }}>Add new inventory from a supplier</div>
               </div>
             </div>
-          )}
 
-          {/* Stock Out Tab */}
-          {activeTab === 'out' && (
-            <div className="max-w-lg">
-              <div className="bg-white rounded-xl border border-slate-200 p-6 space-y-5">
-                <div className="flex items-center gap-3 pb-3 border-b border-slate-100">
-                  <div className="w-8 h-8 bg-red-100 rounded-lg flex items-center justify-center text-red-600 font-bold">
-                    −
-                  </div>
-                  <div>
-                    <h2 className="font-semibold text-slate-800">Record Stock Out</h2>
-                    <p className="text-xs text-slate-400">Manually deduct stock (e.g. damage, loss)</p>
-                  </div>
-                </div>
-
-                {outSuccess && (
-                  <div className="bg-green-50 border border-green-200 rounded-lg px-4 py-3 text-sm text-green-700">
-                    ✓ Stock-out recorded successfully
-                  </div>
-                )}
-
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">
-                      Product <span className="text-red-400">*</span>
-                    </label>
-                    <select
-                      value={outProductId}
-                      onChange={(e) => setOutProductId(e.target.value)}
-                      className="w-full border border-slate-300 rounded-lg px-3 py-2.5 text-sm focus:border-amber-500 focus:outline-none"
-                    >
-                      <option value="">Select product</option>
-                      {products.map((p) => (
-                        <option key={p.id} value={p.id}>
-                          {p.name} — {p.sku}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">
-                      Quantity <span className="text-red-400">*</span>
-                    </label>
-                    <input
-                      type="number"
-                      min={1}
-                      value={outQuantity || ''}
-                      onChange={(e) => setOutQuantity(Number(e.target.value))}
-                      placeholder="e.g. 5"
-                      className="w-full border border-slate-300 rounded-lg px-3 py-2.5 text-sm focus:border-amber-500 focus:outline-none"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">
-                      Reason <span className="text-red-400">*</span>
-                    </label>
-                    <textarea
-                      value={outReason}
-                      onChange={(e) => setOutReason(e.target.value)}
-                      placeholder="e.g. Damaged goods, expired items"
-                      rows={3}
-                      className="w-full border border-slate-300 rounded-lg px-3 py-2.5 text-sm focus:border-amber-500 focus:outline-none resize-none"
-                    />
-                  </div>
-
-                  {outError && (
-                    <p className="text-sm text-red-500">{outError}</p>
-                  )}
-
-                  <button
-                    onClick={handleStockOut}
-                    disabled={stockOutMutation.isPending}
-                    className="w-full bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white font-semibold py-2.5 rounded-lg transition-colors text-sm"
-                  >
-                    {stockOutMutation.isPending ? 'Recording...' : 'Record Stock Out'}
-                  </button>
-                </div>
+            {inSuccess && (
+              <div style={{ background: SUCCESS_DIM, border: '1px solid rgba(52,211,153,0.3)', borderRadius: 8, padding: '12px 16px', fontSize: 13, color: SUCCESS, marginBottom: 16 }}>
+                ✓ Stock-in recorded successfully
               </div>
-            </div>
-          )}
+            )}
 
-          {/* Movement History Tab */}
-          {activeTab === 'history' && (
-            <div className="space-y-4">
-              <div className="flex flex-wrap gap-3 items-center">
-                <input
-                  type="text"
-                  value={historySearch}
-                  onChange={(e) => setHistorySearch(e.target.value)}
-                  placeholder="Search by product..."
-                  className="border border-slate-300 rounded-lg px-4 py-2.5 text-sm focus:border-amber-500 focus:outline-none w-56"
-                />
-                <select
-                  value={historyType}
-                  onChange={(e) => setHistoryType(e.target.value as 'all' | 'in' | 'out')}
-                  className="border border-slate-300 rounded-lg px-3 py-2.5 text-sm focus:border-amber-500 focus:outline-none"
-                >
-                  <option value="all">All Types</option>
-                  <option value="in">Stock In</option>
-                  <option value="out">Stock Out</option>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              <div>
+                <label style={labelStyle}>Product <span style={{ color: DANGER }}>*</span></label>
+                <select value={inProductId} onChange={(e) => setInProductId(e.target.value)} style={inputStyle}>
+                  <option value="">Select product</option>
+                  {products.map((p) => <option key={p.id} value={p.id}>{p.name} — {p.sku}</option>)}
                 </select>
-                <input
-                  type="date"
-                  value={dateFrom}
-                  onChange={(e) => setDateFrom(e.target.value)}
-                  className="border border-slate-300 rounded-lg px-3 py-2.5 text-sm focus:border-amber-500 focus:outline-none"
-                />
-                <span className="text-slate-400 text-sm">to</span>
-                <input
-                  type="date"
-                  value={dateTo}
-                  onChange={(e) => setDateTo(e.target.value)}
-                  className="border border-slate-300 rounded-lg px-3 py-2.5 text-sm focus:border-amber-500 focus:outline-none"
-                />
               </div>
+              <div>
+                <label style={labelStyle}>Quantity <span style={{ color: DANGER }}>*</span></label>
+                <input type="number" min={1} value={inQuantity || ''} onChange={(e) => setInQuantity(Number(e.target.value))} placeholder="e.g. 50" style={inputStyle} />
+              </div>
+              <div>
+                <label style={labelStyle}>Reason / Source <span style={{ color: DANGER }}>*</span></label>
+                <textarea value={inReason} onChange={(e) => setInReason(e.target.value)} placeholder="e.g. Delivery from Supplier ABC" rows={3}
+                  style={{ ...inputStyle, resize: 'none', fontFamily: 'inherit' }} />
+              </div>
+              {inError && <p style={{ color: DANGER, fontSize: 13, margin: 0 }}>{inError}</p>}
+              <button onClick={handleStockIn} disabled={stockInMutation.isPending}
+                style={{ background: stockInMutation.isPending ? BORDER : SUCCESS, border: 'none', borderRadius: 8, padding: '12px', color: '#fff', fontSize: 13, fontWeight: 700, cursor: stockInMutation.isPending ? 'not-allowed' : 'pointer', transition: 'background 0.15s' }}>
+                {stockInMutation.isPending ? 'Recording…' : 'Record Stock In'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
-              <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
-                {movementsLoading ? (
-                  <div className="py-16 text-center text-slate-400 text-sm">Loading...</div>
-                ) : (
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="bg-slate-50 border-b border-slate-200">
-                        <th className="text-left px-4 py-3 font-medium text-slate-600">Product</th>
-                        <th className="text-left px-4 py-3 font-medium text-slate-600">SKU</th>
-                        <th className="text-left px-4 py-3 font-medium text-slate-600">Type</th>
-                        <th className="text-left px-4 py-3 font-medium text-slate-600">Quantity</th>
-                        <th className="text-left px-4 py-3 font-medium text-slate-600">Reason</th>
-                        <th className="text-left px-4 py-3 font-medium text-slate-600">Date</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                      {movements.map((m) => (
-                        <tr key={m.id} className="hover:bg-slate-50">
-                          <td className="px-4 py-3 font-medium text-slate-700">
-                            {m.products?.name ?? m.product_id}
-                          </td>
-                          <td className="px-4 py-3 font-mono text-xs text-slate-500">
-                            {m.products?.sku ?? '—'}
-                          </td>
-                          <td className="px-4 py-3">
-                            <span
-                              className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-                                m.type === 'in'
-                                  ? 'bg-green-100 text-green-700'
-                                  : 'bg-red-100 text-red-600'
-                              }`}
-                            >
-                              {m.type === 'in' ? '↑ Stock In' : '↓ Stock Out'}
-                            </span>
-                          </td>
-                          <td className="px-4 py-3 font-semibold text-slate-800">{m.quantity}</td>
-                          <td className="px-4 py-3 text-slate-500 max-w-xs truncate">{m.reason}</td>
-                          <td className="px-4 py-3 text-slate-500 whitespace-nowrap">
-                            {new Date(m.created_at).toLocaleString()}
-                          </td>
-                        </tr>
-                      ))}
-                      {movements.length === 0 && (
-                        <tr>
-                          <td colSpan={6} className="px-4 py-12 text-center text-slate-400 text-sm">
-                            No movements found
-                          </td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
-                )}
+      {/* ── Stock Out ── */}
+      {activeTab === 'out' && (
+        <div style={{ maxWidth: 480 }}>
+          <div style={card({ padding: 28 })}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, paddingBottom: 20, marginBottom: 20, borderBottom: `1px solid ${BORDER}` }}>
+              <div style={{ width: 40, height: 40, borderRadius: 10, background: DANGER_DIM, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, color: DANGER, fontWeight: 800 }}>−</div>
+              <div>
+                <div style={{ color: TEXT_PRIMARY, fontSize: 15, fontWeight: 700 }}>Record Stock Out</div>
+                <div style={{ color: TEXT_MUTED, fontSize: 12, marginTop: 2 }}>Manually deduct stock (e.g. damage, loss)</div>
               </div>
             </div>
-          )}
 
+            {outSuccess && (
+              <div style={{ background: SUCCESS_DIM, border: '1px solid rgba(52,211,153,0.3)', borderRadius: 8, padding: '12px 16px', fontSize: 13, color: SUCCESS, marginBottom: 16 }}>
+                ✓ Stock-out recorded successfully
+              </div>
+            )}
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              <div>
+                <label style={labelStyle}>Product <span style={{ color: DANGER }}>*</span></label>
+                <select value={outProductId} onChange={(e) => setOutProductId(e.target.value)} style={inputStyle}>
+                  <option value="">Select product</option>
+                  {products.map((p) => <option key={p.id} value={p.id}>{p.name} — {p.sku}</option>)}
+                </select>
+              </div>
+              <div>
+                <label style={labelStyle}>Quantity <span style={{ color: DANGER }}>*</span></label>
+                <input type="number" min={1} value={outQuantity || ''} onChange={(e) => setOutQuantity(Number(e.target.value))} placeholder="e.g. 5" style={inputStyle} />
+              </div>
+              <div>
+                <label style={labelStyle}>Reason <span style={{ color: DANGER }}>*</span></label>
+                <textarea value={outReason} onChange={(e) => setOutReason(e.target.value)} placeholder="e.g. Damaged goods, expired items" rows={3}
+                  style={{ ...inputStyle, resize: 'none', fontFamily: 'inherit' }} />
+              </div>
+              {outError && <p style={{ color: DANGER, fontSize: 13, margin: 0 }}>{outError}</p>}
+              <button onClick={handleStockOut} disabled={stockOutMutation.isPending}
+                style={{ background: stockOutMutation.isPending ? BORDER : DANGER, border: 'none', borderRadius: 8, padding: '12px', color: '#fff', fontSize: 13, fontWeight: 700, cursor: stockOutMutation.isPending ? 'not-allowed' : 'pointer', transition: 'background 0.15s' }}>
+                {stockOutMutation.isPending ? 'Recording…' : 'Record Stock Out'}
+              </button>
+            </div>
+          </div>
         </div>
-      </div>
+      )}
+
+      {/* ── Movement History ── */}
+      {activeTab === 'history' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'center' }}>
+            <input type="text" value={historySearch} onChange={(e) => setHistorySearch(e.target.value)}
+              placeholder="Search by product…" style={{ ...inputStyle, width: 220 }} />
+            <select value={historyType} onChange={(e) => setHistoryType(e.target.value as 'all' | 'in' | 'out')} style={{ ...inputStyle, width: 'auto' }}>
+              <option value="all">All Types</option>
+              <option value="in">Stock In</option>
+              <option value="out">Stock Out</option>
+            </select>
+            <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} style={{ ...inputStyle, width: 'auto' }} />
+            <span style={{ color: TEXT_MUTED, fontSize: 13 }}>to</span>
+            <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} style={{ ...inputStyle, width: 'auto' }} />
+          </div>
+
+          <div style={card({ overflow: 'hidden', padding: 0 })}>
+            {movementsLoading ? (
+              <div style={{ padding: '48px', textAlign: 'center', color: TEXT_MUTED, fontSize: 13 }}>Loading…</div>
+            ) : (
+              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <thead>
+                  <tr>
+                    {['Product', 'SKU', 'Type', 'Quantity', 'Reason', 'Date'].map((h) => (
+                      <th key={h} style={thStyle}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {movements.map((m) => {
+                    const mp = (m as any).products ?? (m as any).product ?? {}
+                    return (
+                      <tr key={m.id}
+                      onMouseEnter={(e) => (e.currentTarget.style.background = BG_BASE)}
+                      onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}>
+                      <td style={{ ...tdStyle, color: TEXT_PRIMARY, fontWeight: 600 }}>{mp.name ?? m.product_id ?? '—'}</td>
+                      <td style={{ ...tdStyle, color: TEXT_SECONDARY, fontFamily: 'monospace', fontSize: 12 }}>{mp.sku ?? '—'}</td>
+                      <td style={{ ...tdStyle }}>
+                        <span style={{
+                          fontSize: 10, fontWeight: 700, padding: '3px 10px', borderRadius: 20,
+                          background: m.type === 'in' ? SUCCESS_DIM : DANGER_DIM,
+                          color: m.type === 'in' ? SUCCESS : DANGER,
+                        }}>
+                          {m.type === 'in' ? '↑ Stock In' : '↓ Stock Out'}
+                        </span>
+                      </td>
+                      <td style={{ ...tdStyle, color: TEXT_PRIMARY, fontWeight: 700 }}>{m.quantity}</td>
+                      <td style={{ ...tdStyle, color: TEXT_SECONDARY, maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.reason}</td>
+                      <td style={{ ...tdStyle, color: TEXT_MUTED, whiteSpace: 'nowrap', fontSize: 12 }}>
+                        {new Date(m.created_at).toLocaleString('en-PH')}
+                      </td>
+                    </tr>
+                    )
+                  })}
+                  {movements.length === 0 && (
+                    <tr><td colSpan={6} style={{ padding: '48px', textAlign: 'center', color: TEXT_MUTED, fontSize: 13 }}>No movements found</td></tr>
+                  )}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   )
 }
