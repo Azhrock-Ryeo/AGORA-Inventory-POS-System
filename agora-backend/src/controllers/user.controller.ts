@@ -36,7 +36,8 @@ export async function createUser(req: Request, res: Response) {
 
 export async function updateUser(req: Request, res: Response) {
   try {
-    const { id } = req.params
+    const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id
+    if (!id) return res.status(400).json({ message: 'User id is required' })
     const { name, email, role, password } = req.body
 
     const data: any = {}
@@ -58,7 +59,7 @@ export async function updateUser(req: Request, res: Response) {
 
 export async function toggleUserStatus(req: Request, res: Response) {
   try {
-    const { id } = req.params
+    const id = req.params.id as string
     const caller = (req as any).user
 
     if (caller.userId === id) {

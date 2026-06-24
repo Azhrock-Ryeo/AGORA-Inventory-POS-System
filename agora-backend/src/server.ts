@@ -9,6 +9,7 @@ import supplierRoutes from './routes/supplier.routes'
 import stockRoutes from './routes/stock.routes'
 import orderRoutes from './routes/order.routes'
 import transactionRoutes from './routes/transaction.routes'
+import userRoutes from './routes/user.routes'  
 
 dotenv.config()
 
@@ -29,6 +30,7 @@ app.use('/api/suppliers', supplierRoutes)
 app.use('/api/stock', stockRoutes)
 app.use('/api/orders', orderRoutes)
 app.use('/api/transactions', transactionRoutes)
+app.use('/api/users', userRoutes)
 
 const PORT = process.env.PORT || 3000
 app.listen(PORT, () => {
