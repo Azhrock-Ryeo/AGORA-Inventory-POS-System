@@ -5,14 +5,12 @@ import { calculateDiscount } from '../services/order.service'
 export async function createOrder(req: Request, res: Response) {
   try {
     const user = (req as any).user
-    const { items, discount_type, discount_value, amount_paid, payment_method = 'cash' } = req.body
+    const { items, discount_type, discount_value, amount_paid, payment_method = 'CASH' } = req.body
 
     if (!Array.isArray(items) || items.length === 0) {
       return res.status(400).json({ message: 'items array is required' })
     }
 
-    // FIX 1: Normalise discount_type to uppercase so calculateDiscount works correctly.
-    // The frontend sends 'flat' / 'percentage' (lowercase); the service expects 'FLAT' / 'PERCENTAGE'.
     const normalisedDiscountType = discount_type
       ? (String(discount_type).toUpperCase() as 'FLAT' | 'PERCENTAGE')
       : undefined
@@ -48,18 +46,14 @@ export async function createOrder(req: Request, res: Response) {
         },
       })
 
-      // FIX 2: Create the transaction record inside the same DB transaction so
-      // PaymentsPage always has data and amount_paid / change are persisted.
       const paid = Number(amount_paid ?? total)
       await tx.transaction.create({
         data: {
           order_id: order.id,
           amount_paid: paid,
           change: paid - total,
-          payment_method,
-          // Cast to any to satisfy TypeScript when TransactionStatus type
-          // is not readily importable here.
-          status: 'PAID' as any,
+          payment_method: String(payment_method).toUpperCase() as any,
+          status: 'COMPLETED',
         },
       })
 
@@ -82,8 +76,6 @@ export async function createOrder(req: Request, res: Response) {
       return order.id
     })
 
-    // FIX 3: Re-fetch the completed order with full relations so the receipt modal
-    // has product names, cashier info, and transaction data.
     const fullOrder = await prisma.order.findUnique({
       where: { id: orderId },
       include: {
@@ -108,6 +100,7 @@ export async function createOrder(req: Request, res: Response) {
     if (typeof err.message === 'string' && err.message === 'INVALID_DISCOUNT_PERCENTAGE') {
       return res.status(400).json({ message: 'Discount percentage must be between 0 and 100' })
     }
+    console.error(err)
     res.status(500).json({ message: 'Failed to create order' })
   }
 }
@@ -131,8 +124,6 @@ export async function getOrders(req: Request, res: Response) {
           cashier: { select: { id: true, name: true } },
           items: {
             include: {
-              // FIX 4: Ensure unit_price is returned alongside product name so
-              // the order detail modal can compute line totals correctly.
               product: { select: { id: true, name: true, sku: true } },
             },
           },

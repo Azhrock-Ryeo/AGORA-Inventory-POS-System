@@ -373,10 +373,20 @@ export default function InventoryPage() {
   // ── API mutations ─────────────────────────────────────────────────────────
   const saveProduct = useMutation({
     mutationFn: async (data: Partial<Product>) => {
+      const payload = {
+        name: data.name,
+        sku: data.sku,
+        barcode: data.barcode || undefined,
+        category_id: data.categoryId,
+        supplier_id: data.supplierId,
+        price: Number(data.price),
+        status: (data.status as string)?.toUpperCase(),
+        description: data.description || undefined,
+      }
       if (editingProduct?.id) {
-        await api.put(`/products/${editingProduct.id}`, data)
+        await api.put(`/products/${editingProduct.id}`, payload)
       } else {
-        await api.post('/products', data)
+        await api.post('/products', payload)
       }
     },
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['products'] }); setProductModal(false) },
@@ -385,7 +395,7 @@ export default function InventoryPage() {
   const toggleProductStatus = useMutation({
     mutationFn: async (product: Product) => {
       await api.put(`/products/${product.id}`, {
-        status: product.status === 'active' ? 'inactive' : 'active',
+        status: product.status === 'active' ? 'INACTIVE' : 'ACTIVE',
       })
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['products'] }),
@@ -567,10 +577,10 @@ export default function InventoryPage() {
                       <td style={{ ...tdStyle, textAlign: 'right' }}>
                         <span style={{
                           fontSize: 10, fontWeight: 700, padding: '3px 10px', borderRadius: 20,
-                          background: p.status === 'active' ? SUCCESS_DIM : 'rgba(100,116,139,0.15)',
-                          color: p.status === 'active' ? SUCCESS : TEXT_MUTED,
+                          background: p.status === 'ACTIVE' ? SUCCESS_DIM : 'rgba(100,116,139,0.15)',
+                          color: p.status === 'ACTIVE' ? SUCCESS : TEXT_MUTED,
                         }}>
-                          {p.status === 'active' ? 'Active' : 'Inactive'}
+                          {p.status === 'ACTIVE' ? 'Active' : 'Inactive'}
                         </span>
                       </td>
                       <td style={{ ...tdStyle, textAlign: 'right' }}>
@@ -584,12 +594,12 @@ export default function InventoryPage() {
                             onClick={() => toggleProductStatus.mutate(p)}
                             style={{
                               background: 'none',
-                              border: `1px solid ${p.status === 'active' ? 'rgba(248,113,113,0.4)' : 'rgba(52,211,153,0.4)'}`,
+                              border: `1px solid ${p.status === 'ACTIVE' ? 'rgba(248,113,113,0.4)' : 'rgba(52,211,153,0.4)'}`,
                               borderRadius: 6, padding: '4px 10px', fontSize: 12,
-                              color: p.status === 'active' ? DANGER : SUCCESS,
+                              color: p.status === 'ACTIVE' ? DANGER : SUCCESS,
                               cursor: 'pointer',
                             }}>
-                            {p.status === 'active' ? 'Deactivate' : 'Activate'}
+                            {p.status === 'ACTIVE' ? 'Deactivate' : 'Activate'}
                           </button>
                         </div>
                       </td>
