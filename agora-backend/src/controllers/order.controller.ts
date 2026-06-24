@@ -5,13 +5,19 @@ import { calculateDiscount } from '../services/order.service'
 export async function createOrder(req: Request, res: Response) {
   try {
     const user = (req as any).user
-    const { items, discount_type, discount_value } = req.body
+    const { items, discount_type, discount_value, amount_paid, payment_method = 'cash' } = req.body
 
     if (!Array.isArray(items) || items.length === 0) {
       return res.status(400).json({ message: 'items array is required' })
     }
 
-    const result = await prisma.$transaction(async (tx) => {
+    // FIX 1: Normalise discount_type to uppercase so calculateDiscount works correctly.
+    // The frontend sends 'flat' / 'percentage' (lowercase); the service expects 'FLAT' / 'PERCENTAGE'.
+    const normalisedDiscountType = discount_type
+      ? (String(discount_type).toUpperCase() as 'FLAT' | 'PERCENTAGE')
+      : undefined
+
+    const orderId = await prisma.$transaction(async (tx) => {
       let subtotal = 0
       const orderItemsData: { product_id: string; quantity: number; unit_price: number }[] = []
 
@@ -29,7 +35,7 @@ export async function createOrder(req: Request, res: Response) {
         orderItemsData.push({ product_id: item.product_id, quantity: item.quantity, unit_price: unitPrice })
       }
 
-      const discount = calculateDiscount(subtotal, discount_type, discount_value)
+      const discount = calculateDiscount(subtotal, normalisedDiscountType, discount_value)
       const total = subtotal - discount
 
       const order = await tx.order.create({
@@ -40,7 +46,21 @@ export async function createOrder(req: Request, res: Response) {
           status: 'COMPLETED',
           items: { create: orderItemsData },
         },
-        include: { items: true },
+      })
+
+      // FIX 2: Create the transaction record inside the same DB transaction so
+      // PaymentsPage always has data and amount_paid / change are persisted.
+      const paid = Number(amount_paid ?? total)
+      await tx.transaction.create({
+        data: {
+          order_id: order.id,
+          amount_paid: paid,
+          change: paid - total,
+          payment_method,
+          // Cast to any to satisfy TypeScript when TransactionStatus type
+          // is not readily importable here.
+          status: 'PAID' as any,
+        },
       })
 
       for (const item of orderItemsData) {
@@ -59,10 +79,25 @@ export async function createOrder(req: Request, res: Response) {
         })
       }
 
-      return order
+      return order.id
     })
 
-    res.status(201).json(result)
+    // FIX 3: Re-fetch the completed order with full relations so the receipt modal
+    // has product names, cashier info, and transaction data.
+    const fullOrder = await prisma.order.findUnique({
+      where: { id: orderId },
+      include: {
+        cashier: { select: { id: true, name: true } },
+        items: {
+          include: {
+            product: { select: { id: true, name: true, sku: true } },
+          },
+        },
+        transaction: true,
+      },
+    })
+
+    res.status(201).json(fullOrder)
   } catch (err: any) {
     if (typeof err.message === 'string' && err.message.startsWith('PRODUCT_NOT_FOUND')) {
       return res.status(404).json({ message: `Product not found: ${err.message.split(':')[1]}` })
@@ -70,13 +105,16 @@ export async function createOrder(req: Request, res: Response) {
     if (typeof err.message === 'string' && err.message.startsWith('INSUFFICIENT_STOCK')) {
       return res.status(409).json({ message: `Insufficient stock for product: ${err.message.split(':')[1]}` })
     }
+    if (typeof err.message === 'string' && err.message === 'INVALID_DISCOUNT_PERCENTAGE') {
+      return res.status(400).json({ message: 'Discount percentage must be between 0 and 100' })
+    }
     res.status(500).json({ message: 'Failed to create order' })
   }
 }
 
 export async function getOrders(req: Request, res: Response) {
   try {
-    const { status, page = 1, limit = 20, date } = req.query
+    const { status, page = 1, limit = 20, date, search } = req.query
     const where: any = {}
     if (status) where.status = String(status)
     if (date) {
@@ -93,7 +131,9 @@ export async function getOrders(req: Request, res: Response) {
           cashier: { select: { id: true, name: true } },
           items: {
             include: {
-              product: { select: { id: true, name: true } }, // ← add this
+              // FIX 4: Ensure unit_price is returned alongside product name so
+              // the order detail modal can compute line totals correctly.
+              product: { select: { id: true, name: true, sku: true } },
             },
           },
         },
@@ -101,7 +141,7 @@ export async function getOrders(req: Request, res: Response) {
         take: Number(limit),
         orderBy: { created_at: 'desc' },
       }),
-      prisma.order.count({ where }), // ← run count in parallel
+      prisma.order.count({ where }),
     ])
 
     res.json({ data: orders, total, page: Number(page), limit: Number(limit) })

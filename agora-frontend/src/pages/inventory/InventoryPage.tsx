@@ -1,43 +1,31 @@
-import { useMemo, useState } from 'react';
-import ProductFormModal from '../../components/inventory/ProductFormModal';
-import CategoryFormModal from '../../components/inventory/CategoryFormModal';
-import SupplierFormModal from '../../components/inventory/SupplierFormModal';
-import { mockCategories, mockSuppliers, mockProducts } from '../../data/mockInventory';
-import type { Product, Category, Supplier } from '../../types/inventory';
+import { useMemo, useState } from 'react'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import api from '../../services/api'
+import type { Product, Category, Supplier } from '../../types/inventory'
 
-type Tab = 'products' | 'categories' | 'suppliers';
+type Tab = 'products' | 'categories' | 'suppliers'
 
-// ── design tokens ────────────────────────────────────────────────────────────
-const BG_BASE = '#0f172a';
-const BG_CARD = '#1e293b';
-const BORDER = '#334155';
-const TEXT_PRIMARY = '#f1f5f9';
-const TEXT_SECONDARY = '#94a3b8';
-const TEXT_MUTED = '#475569';
-const ACCENT = '#f59e0b';
-const ACCENT_DIM = 'rgba(245,158,11,0.12)';
-const SUCCESS = '#34d399';
-const SUCCESS_DIM = 'rgba(52,211,153,0.12)';
-const DANGER = '#f87171';
-const DANGER_DIM = 'rgba(248,113,113,0.12)';
+// ── design tokens ─────────────────────────────────────────────────────────────
+const BG_BASE    = '#0f172a'
+const BG_CARD    = '#1e293b'
+const BORDER     = '#334155'
+const TEXT_PRIMARY   = '#f1f5f9'
+const TEXT_SECONDARY = '#94a3b8'
+const TEXT_MUTED     = '#475569'
+const ACCENT     = '#f59e0b'
+const SUCCESS    = '#34d399'
+const SUCCESS_DIM = 'rgba(52,211,153,0.12)'
+const DANGER     = '#f87171'
+const DANGER_DIM  = 'rgba(248,113,113,0.12)'
 
 const card = (extra?: React.CSSProperties): React.CSSProperties => ({
   background: BG_CARD,
   border: `1px solid ${BORDER}`,
   borderRadius: '12px',
   ...extra,
-});
+})
 
-const labelStyle: React.CSSProperties = {
-  fontSize: '11px',
-  fontWeight: 700,
-  letterSpacing: '0.08em',
-  textTransform: 'uppercase',
-  color: TEXT_MUTED,
-  marginBottom: '6px',
-};
-
-const inputStyle: React.CSSProperties = {
+const inputBase: React.CSSProperties = {
   background: BG_BASE,
   border: `1px solid ${BORDER}`,
   borderRadius: 8,
@@ -45,113 +33,444 @@ const inputStyle: React.CSSProperties = {
   color: TEXT_PRIMARY,
   fontSize: 13,
   outline: 'none',
-};
+  width: '100%',
+  boxSizing: 'border-box',
+}
 
-const peso = (value: number) =>
-  `₱${value.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+const labelStyle: React.CSSProperties = {
+  fontSize: 11,
+  fontWeight: 700,
+  letterSpacing: '0.08em',
+  textTransform: 'uppercase',
+  color: TEXT_MUTED,
+  marginBottom: 6,
+  display: 'block',
+}
 
+const thStyle: React.CSSProperties = {
+  padding: '12px 20px',
+  textAlign: 'left',
+  fontSize: 11,
+  fontWeight: 700,
+  color: TEXT_MUTED,
+  textTransform: 'uppercase',
+  letterSpacing: '0.06em',
+  background: BG_BASE,
+}
+
+const tdStyle: React.CSSProperties = {
+  padding: '14px 20px',
+  fontSize: 13,
+  borderTop: `1px solid ${BORDER}`,
+}
+
+const peso = (v: number) =>
+  `₱${Number(v).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+
+// ── Overlay Modal wrapper ─────────────────────────────────────────────────────
+function Modal({ open, onClose, title, children }: {
+  open: boolean
+  onClose: () => void
+  title: string
+  children: React.ReactNode
+}) {
+  if (!open) return null
+  return (
+    <div
+      onClick={onClose}
+      style={{
+        position: 'fixed', inset: 0,
+        background: 'rgba(0,0,0,0.65)',
+        zIndex: 100,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        padding: 16,
+      }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={card({ padding: 28, width: '100%', maxWidth: 480, maxHeight: '90vh', overflowY: 'auto' })}
+      >
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
+          <h2 style={{ color: TEXT_PRIMARY, fontSize: 17, fontWeight: 700, margin: 0 }}>{title}</h2>
+          <button onClick={onClose}
+            style={{ background: 'none', border: 'none', color: TEXT_MUTED, fontSize: 22, cursor: 'pointer', lineHeight: 1 }}>
+            ×
+          </button>
+        </div>
+        {children}
+      </div>
+    </div>
+  )
+}
+
+// ── Field helper ──────────────────────────────────────────────────────────────
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+      <label style={labelStyle}>{label}</label>
+      {children}
+    </div>
+  )
+}
+
+// ── Form buttons ──────────────────────────────────────────────────────────────
+function FormActions({ onCancel, loading, label }: { onCancel: () => void; loading: boolean; label: string }) {
+  return (
+    <div style={{ display: 'flex', gap: 10, marginTop: 24 }}>
+      <button onClick={onCancel}
+        style={{ flex: 1, background: 'none', border: `1px solid ${BORDER}`, borderRadius: 8, padding: '11px', color: TEXT_SECONDARY, fontSize: 13, cursor: 'pointer' }}>
+        Cancel
+      </button>
+      <button type="submit" disabled={loading}
+        style={{ flex: 1, background: ACCENT, border: 'none', borderRadius: 8, padding: '11px', color: '#fff', fontSize: 13, fontWeight: 700, cursor: loading ? 'not-allowed' : 'pointer', opacity: loading ? 0.7 : 1 }}>
+        {loading ? 'Saving…' : label}
+      </button>
+    </div>
+  )
+}
+
+// ── Product Form ──────────────────────────────────────────────────────────────
+function ProductForm({ product, categories, suppliers, onSave, onClose }: {
+  product: Product | null
+  categories: Category[]
+  suppliers: Supplier[]
+  onSave: (data: Partial<Product>) => void
+  onClose: () => void
+}) {
+  const [form, setForm] = useState({
+    name: product?.name ?? '',
+    sku: product?.sku ?? '',
+    barcode: product?.barcode ?? '',
+    categoryId: product?.categoryId ?? '',
+    supplierId: product?.supplierId ?? '',
+    price: product?.price ?? 0,
+    status: product?.status ?? 'active',
+    description: product?.description ?? '',
+  })
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+
+  const set = (k: string) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) =>
+    setForm((prev) => ({ ...prev, [k]: e.target.value }))
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!form.name.trim()) { setError('Product name is required.'); return }
+    if (!form.sku.trim()) { setError('SKU is required.'); return }
+    if (!form.categoryId) { setError('Please select a category.'); return }
+    if (!form.supplierId) { setError('Please select a supplier.'); return }
+    if (Number(form.price) <= 0) { setError('Price must be greater than 0.'); return }
+    setLoading(true)
+    setError('')
+    try {
+      await onSave({ ...form, price: Number(form.price) })
+    } catch (err: any) {
+      setError(err?.response?.data?.message ?? 'Failed to save product.')
+      setLoading(false)
+    }
+  }
+
+  return (
+    <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+      {error && (
+        <div style={{ background: DANGER_DIM, border: '1px solid rgba(248,113,113,0.3)', borderRadius: 8, padding: '10px 14px', color: DANGER, fontSize: 13 }}>
+          {error}
+        </div>
+      )}
+      <Field label="Product name">
+        <input style={inputBase} value={form.name} onChange={set('name')} placeholder="e.g. Coca-Cola 1.5L" />
+      </Field>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+        <Field label="SKU">
+          <input style={inputBase} value={form.sku} onChange={set('sku')} placeholder="e.g. CC-1500" />
+        </Field>
+        <Field label="Barcode / QR (optional)">
+          <input style={inputBase} value={form.barcode} onChange={set('barcode')} placeholder="e.g. 4901427030505" />
+        </Field>
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+        <Field label="Category">
+          <select style={inputBase} value={form.categoryId} onChange={set('categoryId')}>
+            <option value="">Select category</option>
+            {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+          </select>
+        </Field>
+        <Field label="Supplier">
+          <select style={inputBase} value={form.supplierId} onChange={set('supplierId')}>
+            <option value="">Select supplier</option>
+            {suppliers.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+          </select>
+        </Field>
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+        <Field label="Price (₱)">
+          <input style={inputBase} type="number" min={0} step="0.01" value={form.price} onChange={set('price')} placeholder="0.00" />
+        </Field>
+        <Field label="Status">
+          <select style={inputBase} value={form.status} onChange={set('status')}>
+            <option value="active">Active</option>
+            <option value="inactive">Inactive</option>
+          </select>
+        </Field>
+      </div>
+      <Field label="Description (optional)">
+        <textarea style={{ ...inputBase, resize: 'vertical', minHeight: 72 }} value={form.description} onChange={set('description')} placeholder="Short product description…" />
+      </Field>
+      <FormActions onCancel={onClose} loading={loading} label={product ? 'Save changes' : 'Add product'} />
+    </form>
+  )
+}
+
+// ── Category Form ─────────────────────────────────────────────────────────────
+function CategoryForm({ category, onSave, onClose }: {
+  category: Category | null
+  onSave: (data: Partial<Category>) => void
+  onClose: () => void
+}) {
+  const [form, setForm] = useState({ name: category?.name ?? '', description: category?.description ?? '' })
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!form.name.trim()) { setError('Name is required.'); return }
+    setLoading(true); setError('')
+    try { await onSave(form) } catch { setError('Failed to save category.'); setLoading(false) }
+  }
+
+  return (
+    <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+      {error && <div style={{ background: DANGER_DIM, border: '1px solid rgba(248,113,113,0.3)', borderRadius: 8, padding: '10px 14px', color: DANGER, fontSize: 13 }}>{error}</div>}
+      <Field label="Name">
+        <input style={inputBase} value={form.name} onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))} placeholder="e.g. Canned Goods" />
+      </Field>
+      <Field label="Description (optional)">
+        <textarea style={{ ...inputBase, resize: 'vertical', minHeight: 72 }} value={form.description} onChange={(e) => setForm((p) => ({ ...p, description: e.target.value }))} placeholder="Short description…" />
+      </Field>
+      <FormActions onCancel={onClose} loading={loading} label={category ? 'Save changes' : 'Add category'} />
+    </form>
+  )
+}
+
+// ── Supplier Form ─────────────────────────────────────────────────────────────
+function SupplierForm({ supplier, onSave, onClose }: {
+  supplier: Supplier | null
+  onSave: (data: Partial<Supplier>) => void
+  onClose: () => void
+}) {
+  const [form, setForm] = useState({
+    name: supplier?.name ?? '',
+    contact: supplier?.contact ?? '',
+    address: supplier?.address ?? '',
+  })
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+
+  const set = (k: string) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
+    setForm((p) => ({ ...p, [k]: e.target.value }))
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!form.name.trim()) { setError('Name is required.'); return }
+    setLoading(true); setError('')
+    try { await onSave(form) } catch { setError('Failed to save supplier.'); setLoading(false) }
+  }
+
+  return (
+    <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+      {error && <div style={{ background: DANGER_DIM, border: '1px solid rgba(248,113,113,0.3)', borderRadius: 8, padding: '10px 14px', color: DANGER, fontSize: 13 }}>{error}</div>}
+      <Field label="Supplier name">
+        <input style={inputBase} value={form.name} onChange={set('name')} placeholder="e.g. Unilever Philippines" />
+      </Field>
+      <Field label="Contact">
+        <input style={inputBase} value={form.contact} onChange={set('contact')} placeholder="Phone or email" />
+      </Field>
+      <Field label="Address (optional)">
+        <textarea style={{ ...inputBase, resize: 'vertical', minHeight: 72 }} value={form.address} onChange={set('address')} placeholder="Business address…" />
+      </Field>
+      <FormActions onCancel={onClose} loading={loading} label={supplier ? 'Save changes' : 'Add supplier'} />
+    </form>
+  )
+}
+
+// ── Confirm Delete dialog ─────────────────────────────────────────────────────
+function ConfirmModal({ open, message, onConfirm, onCancel }: {
+  open: boolean; message: string; onConfirm: () => void; onCancel: () => void
+}) {
+  if (!open) return null
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.65)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+      <div style={card({ padding: 28, width: '100%', maxWidth: 360 })}>
+        <p style={{ color: TEXT_PRIMARY, fontSize: 15, fontWeight: 600, margin: '0 0 8px' }}>Are you sure?</p>
+        <p style={{ color: TEXT_SECONDARY, fontSize: 13, margin: '0 0 24px', lineHeight: 1.6 }}>{message}</p>
+        <div style={{ display: 'flex', gap: 10 }}>
+          <button onClick={onCancel}
+            style={{ flex: 1, background: 'none', border: `1px solid ${BORDER}`, borderRadius: 8, padding: 11, color: TEXT_SECONDARY, fontSize: 13, cursor: 'pointer' }}>
+            Cancel
+          </button>
+          <button onClick={onConfirm}
+            style={{ flex: 1, background: DANGER_DIM, border: '1px solid rgba(248,113,113,0.4)', borderRadius: 8, padding: 11, color: DANGER, fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>
+            Delete
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── Main Page ─────────────────────────────────────────────────────────────────
 export default function InventoryPage() {
-  const [tab, setTab] = useState<Tab>('products');
+  const qc = useQueryClient()
 
-  const [products, setProducts] = useState<Product[]>(mockProducts);
-  const [categories, setCategories] = useState<Category[]>(mockCategories);
-  const [suppliers, setSuppliers] = useState<Supplier[]>(mockSuppliers);
+  const [tab, setTab] = useState<Tab>('products')
+  const [search, setSearch] = useState('')
+  const [categoryFilter, setCategoryFilter] = useState('')
 
-  const [search, setSearch] = useState('');
-  const [categoryFilter, setCategoryFilter] = useState('');
+  // modal state
+  const [productModal, setProductModal] = useState(false)
+  const [editingProduct, setEditingProduct] = useState<Product | null>(null)
+  const [categoryModal, setCategoryModal] = useState(false)
+  const [editingCategory, setEditingCategory] = useState<Category | null>(null)
+  const [supplierModal, setSupplierModal] = useState(false)
+  const [editingSupplier, setEditingSupplier] = useState<Supplier | null>(null)
 
-  const [productModalOpen, setProductModalOpen] = useState(false);
-  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
-  const [categoryModalOpen, setCategoryModalOpen] = useState(false);
-  const [editingCategory, setEditingCategory] = useState<Category | null>(null);
-  const [supplierModalOpen, setSupplierModalOpen] = useState(false);
-  const [editingSupplier, setEditingSupplier] = useState<Supplier | null>(null);
+  // confirm delete
+  const [confirmOpen, setConfirmOpen] = useState(false)
+  const [confirmMsg, setConfirmMsg] = useState('')
+  const [confirmAction, setConfirmAction] = useState<() => void>(() => () => {})
 
-  const categoryName = (id: string) => categories.find((c) => c.id === id)?.name ?? 'Uncategorized';
-  const supplierName = (id: string) => suppliers.find((s) => s.id === id)?.name ?? 'Unknown';
+  const askConfirm = (msg: string, action: () => void) => {
+    setConfirmMsg(msg)
+    setConfirmAction(() => action)
+    setConfirmOpen(true)
+  }
 
+  // ── API queries ──────────────────────────────────────────────────────────
+  const { data: products = [], isLoading: loadingProducts } = useQuery<Product[]>({
+    queryKey: ['products'],
+    queryFn: async () => {
+      const res = await api.get('/products')
+      return res.data?.data ?? res.data ?? []
+    },
+  })
+
+  const { data: categories = [] } = useQuery<Category[]>({
+    queryKey: ['categories'],
+    queryFn: async () => {
+      const res = await api.get('/categories')
+      return res.data?.data ?? res.data ?? []
+    },
+  })
+
+  const { data: suppliers = [] } = useQuery<Supplier[]>({
+    queryKey: ['suppliers'],
+    queryFn: async () => {
+      const res = await api.get('/suppliers')
+      return res.data?.data ?? res.data ?? []
+    },
+  })
+
+  // ── API mutations ─────────────────────────────────────────────────────────
+  const saveProduct = useMutation({
+    mutationFn: async (data: Partial<Product>) => {
+      if (editingProduct?.id) {
+        await api.put(`/products/${editingProduct.id}`, data)
+      } else {
+        await api.post('/products', data)
+      }
+    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['products'] }); setProductModal(false) },
+  })
+
+  const toggleProductStatus = useMutation({
+    mutationFn: async (product: Product) => {
+      await api.put(`/products/${product.id}`, {
+        status: product.status === 'active' ? 'inactive' : 'active',
+      })
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['products'] }),
+  })
+
+  const saveCategory = useMutation({
+    mutationFn: async (data: Partial<Category>) => {
+      if (editingCategory?.id) {
+        await api.put(`/categories/${editingCategory.id}`, data)
+      } else {
+        await api.post('/categories', data)
+      }
+    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['categories'] }); setCategoryModal(false) },
+  })
+
+  const deleteCategory = useMutation({
+    mutationFn: async (id: string) => api.delete(`/categories/${id}`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['categories'] }),
+  })
+
+  const saveSupplier = useMutation({
+    mutationFn: async (data: Partial<Supplier>) => {
+      if (editingSupplier?.id) {
+        await api.put(`/suppliers/${editingSupplier.id}`, data)
+      } else {
+        await api.post('/suppliers', data)
+      }
+    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['suppliers'] }); setSupplierModal(false) },
+  })
+
+  const deleteSupplier = useMutation({
+    mutationFn: async (id: string) => api.delete(`/suppliers/${id}`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['suppliers'] }),
+  })
+
+  // ── Delete guards ─────────────────────────────────────────────────────────
+  const handleDeleteCategory = (c: Category) => {
+    const inUse = products.some((p) => p.categoryId === c.id)
+    if (inUse) {
+      askConfirm(
+        `"${c.name}" is assigned to ${products.filter((p) => p.categoryId === c.id).length} product(s). Reassign those products before deleting.`,
+        () => setConfirmOpen(false)
+      )
+      return
+    }
+    askConfirm(`Delete category "${c.name}"? This cannot be undone.`, () => {
+      deleteCategory.mutate(c.id)
+      setConfirmOpen(false)
+    })
+  }
+
+  const handleDeleteSupplier = (s: Supplier) => {
+    const inUse = products.some((p) => p.supplierId === s.id)
+    if (inUse) {
+      askConfirm(
+        `"${s.name}" is linked to ${products.filter((p) => p.supplierId === s.id).length} product(s). Reassign those products before deleting.`,
+        () => setConfirmOpen(false)
+      )
+      return
+    }
+    askConfirm(`Delete supplier "${s.name}"? This cannot be undone.`, () => {
+      deleteSupplier.mutate(s.id)
+      setConfirmOpen(false)
+    })
+  }
+
+  // ── Filtered products ─────────────────────────────────────────────────────
   const filteredProducts = useMemo(() => {
+    const q = search.toLowerCase()
     return products.filter((p) => {
-      const q = search.toLowerCase();
-      const matchesSearch =
+      const matchSearch =
         p.name.toLowerCase().includes(q) ||
         p.sku.toLowerCase().includes(q) ||
-        (p.barcode ?? '').includes(search);
-      const matchesCategory = !categoryFilter || p.categoryId === categoryFilter;
-      return matchesSearch && matchesCategory;
-    });
-  }, [products, search, categoryFilter]);
+        (p.barcode ?? '').includes(search)
+      const matchCat = !categoryFilter || p.categoryId === categoryFilter
+      return matchSearch && matchCat
+    })
+  }, [products, search, categoryFilter])
 
-  const handleSaveProduct = (product: Product) => {
-    setProducts((prev) => {
-      const exists = prev.some((p) => p.id === product.id);
-      return exists ? prev.map((p) => (p.id === product.id ? product : p)) : [product, ...prev];
-    });
-  };
+  const categoryName = (id: string) => categories.find((c) => c.id === id)?.name ?? '—'
+  const supplierName = (id: string) => suppliers.find((s) => s.id === id)?.name ?? '—'
 
-  const handleToggleProductStatus = (product: Product) => {
-    setProducts((prev) =>
-      prev.map((p) =>
-        p.id === product.id ? { ...p, status: p.status === 'active' ? 'inactive' : 'active' } : p
-      )
-    );
-  };
-
-  const handleSaveCategory = (category: Category) => {
-    setCategories((prev) => {
-      const exists = prev.some((c) => c.id === category.id);
-      return exists ? prev.map((c) => (c.id === category.id ? category : c)) : [category, ...prev];
-    });
-  };
-
-  const handleDeleteCategory = (id: string) => {
-    const inUse = products.some((p) => p.categoryId === id);
-    if (inUse) {
-      window.alert('This category is assigned to existing products. Reassign those products before deleting it.');
-      return;
-    }
-    if (window.confirm('Delete this category?')) {
-      setCategories((prev) => prev.filter((c) => c.id !== id));
-    }
-  };
-
-  const handleSaveSupplier = (supplier: Supplier) => {
-    setSuppliers((prev) => {
-      const exists = prev.some((s) => s.id === supplier.id);
-      return exists ? prev.map((s) => (s.id === supplier.id ? supplier : s)) : [supplier, ...prev];
-    });
-  };
-
-  const handleDeleteSupplier = (id: string) => {
-    const inUse = products.some((p) => p.supplierId === id);
-    if (inUse) {
-      window.alert('This supplier is linked to existing products. Reassign those products before deleting it.');
-      return;
-    }
-    if (window.confirm('Delete this supplier?')) {
-      setSuppliers((prev) => prev.filter((s) => s.id !== id));
-    }
-  };
-
-  const TABS: Tab[] = ['products', 'categories', 'suppliers'];
-
-  // ── shared table styles ───────────────────────────────────────────────────
-  const thStyle: React.CSSProperties = {
-    padding: '12px 20px',
-    textAlign: 'left',
-    fontSize: 11,
-    fontWeight: 700,
-    color: TEXT_MUTED,
-    textTransform: 'uppercase',
-    letterSpacing: '0.06em',
-    background: BG_BASE,
-  };
-
-  const tdStyle: React.CSSProperties = {
-    padding: '14px 20px',
-    fontSize: 13,
-    borderTop: `1px solid ${BORDER}`,
-  };
+  const TABS: Tab[] = ['products', 'categories', 'suppliers']
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
@@ -167,42 +486,26 @@ export default function InventoryPage() {
       {/* Tab bar */}
       <div style={{ display: 'flex', gap: 4, borderBottom: `1px solid ${BORDER}` }}>
         {TABS.map((t) => (
-          <button
-            key={t}
-            onClick={() => setTab(t)}
+          <button key={t} onClick={() => setTab(t)}
             style={{
-              position: 'relative',
-              padding: '10px 18px',
-              fontSize: 13,
-              fontWeight: 600,
-              textTransform: 'capitalize',
-              background: 'none',
-              border: 'none',
-              cursor: 'pointer',
-              color: tab === t ? ACCENT : TEXT_MUTED,
-              transition: 'color 0.15s',
-            }}
-          >
+              position: 'relative', padding: '10px 18px', fontSize: 13, fontWeight: 600,
+              textTransform: 'capitalize', background: 'none', border: 'none',
+              cursor: 'pointer', color: tab === t ? ACCENT : TEXT_MUTED, transition: 'color 0.15s',
+            }}>
             {t}
             {tab === t && (
-              <span style={{
-                position: 'absolute',
-                bottom: -1,
-                left: 0,
-                right: 0,
-                height: 2,
-                borderRadius: 2,
-                background: ACCENT,
-              }} />
+              <span style={{ position: 'absolute', bottom: -1, left: 0, right: 0, height: 2, borderRadius: 2, background: ACCENT }} />
             )}
           </button>
         ))}
       </div>
 
-      {/* ── Products Tab ── */}
+      {/* ── Products ── */}
       {tab === 'products' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+
+          {/* Toolbar */}
+          <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
             <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 10 }}>
               {/* Search */}
               <div style={{ position: 'relative' }}>
@@ -210,110 +513,108 @@ export default function InventoryPage() {
                   width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <circle cx="11" cy="11" r="7" /><path d="m21 21-4.3-4.3" />
                 </svg>
-                <input
-                  type="text"
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
+                <input type="text" value={search} onChange={(e) => setSearch(e.target.value)}
                   placeholder="Search name, SKU, or barcode"
-                  style={{ ...inputStyle, paddingLeft: 34, width: 240 }}
-                />
+                  style={{ background: BG_CARD, border: `1px solid ${BORDER}`, borderRadius: 8, padding: '10px 14px', paddingLeft: 34, color: TEXT_PRIMARY, fontSize: 13, outline: 'none', width: 240 }} />
               </div>
               {/* Category filter */}
-              <select
-                value={categoryFilter}
-                onChange={(e) => setCategoryFilter(e.target.value)}
-                style={{ ...inputStyle, paddingRight: 28 }}
-              >
+              <select value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)}
+                style={{ background: BG_CARD, border: `1px solid ${BORDER}`, borderRadius: 8, padding: '10px 14px', color: categoryFilter ? TEXT_PRIMARY : TEXT_MUTED, fontSize: 13, outline: 'none' }}>
                 <option value="">All categories</option>
-                {categories.map((c) => (
-                  <option key={c.id} value={c.id}>{c.name}</option>
-                ))}
+                {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
               </select>
+              {(search || categoryFilter) && (
+                <button onClick={() => { setSearch(''); setCategoryFilter('') }}
+                  style={{ background: 'none', border: 'none', color: TEXT_MUTED, fontSize: 12, cursor: 'pointer', textDecoration: 'underline' }}>
+                  Clear filters
+                </button>
+              )}
             </div>
             <button
-              onClick={() => { setEditingProduct(null); setProductModalOpen(true); }}
-              style={{ background: ACCENT, color: '#fff', border: 'none', borderRadius: 8, padding: '10px 18px', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}
-            >
+              onClick={() => { setEditingProduct(null); setProductModal(true) }}
+              style={{ background: ACCENT, color: '#fff', border: 'none', borderRadius: 8, padding: '10px 18px', fontSize: 13, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}>
               + Add product
             </button>
           </div>
 
-          <div style={card({ overflow: 'hidden', padding: 0 })}>
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-              <thead>
-                <tr>
-                  {['Product', 'SKU / Barcode', 'Category', 'Supplier', 'Price', 'Status', ''].map((h, i) => (
-                    <th key={h} style={{ ...thStyle, textAlign: i >= 4 ? 'right' : 'left' }}>{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {filteredProducts.map((p) => (
-                  <tr key={p.id} style={{ background: 'transparent' }}
-                    onMouseEnter={(e) => (e.currentTarget.style.background = BG_BASE)}
-                    onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}>
-                    <td style={{ ...tdStyle, color: TEXT_PRIMARY, fontWeight: 600 }}>{p.name}</td>
-                    <td style={{ ...tdStyle, color: TEXT_SECONDARY }}>
-                      <div style={{ fontFamily: 'monospace', fontSize: 12 }}>{p.sku}</div>
-                      {p.barcode && <div style={{ fontSize: 11, color: TEXT_MUTED }}>{p.barcode}</div>}
-                    </td>
-                    <td style={{ ...tdStyle, color: TEXT_SECONDARY }}>{categoryName(p.categoryId)}</td>
-                    <td style={{ ...tdStyle, color: TEXT_SECONDARY }}>{supplierName(p.supplierId)}</td>
-                    <td style={{ ...tdStyle, color: TEXT_PRIMARY, fontWeight: 700, textAlign: 'right' }}>{peso(p.price)}</td>
-                    <td style={{ ...tdStyle, textAlign: 'right' }}>
-                      <span style={{
-                        fontSize: 10, fontWeight: 700, padding: '3px 10px', borderRadius: 20,
-                        background: p.status === 'active' ? SUCCESS_DIM : 'rgba(100,116,139,0.15)',
-                        color: p.status === 'active' ? SUCCESS : TEXT_MUTED,
-                      }}>
-                        {p.status === 'active' ? 'Active' : 'Inactive'}
-                      </span>
-                    </td>
-                    <td style={{ ...tdStyle, textAlign: 'right' }}>
-                      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 6 }}>
-                        <button
-                          onClick={() => { setEditingProduct(p); setProductModalOpen(true); }}
-                          style={{ background: 'none', border: `1px solid ${BORDER}`, borderRadius: 6, padding: '4px 10px', fontSize: 12, color: TEXT_SECONDARY, cursor: 'pointer' }}
-                        >
-                          Edit
-                        </button>
-                        <button
-                          onClick={() => handleToggleProductStatus(p)}
-                          style={{
-                            background: 'none',
-                            border: `1px solid ${p.status === 'active' ? 'rgba(248,113,113,0.4)' : 'rgba(52,211,153,0.4)'}`,
-                            borderRadius: 6, padding: '4px 10px', fontSize: 12,
-                            color: p.status === 'active' ? DANGER : SUCCESS,
-                            cursor: 'pointer',
-                          }}
-                        >
-                          {p.status === 'active' ? 'Deactivate' : 'Activate'}
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-                {filteredProducts.length === 0 && (
+          {/* Table */}
+          <div style={{ ...card({ overflow: 'hidden', padding: 0 }), position: 'relative' }}>
+            {loadingProducts && (
+              <div style={{ padding: 40, textAlign: 'center', color: TEXT_MUTED, fontSize: 13 }}>Loading…</div>
+            )}
+            {!loadingProducts && (
+              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <thead>
                   <tr>
-                    <td colSpan={7} style={{ padding: '48px', textAlign: 'center', color: TEXT_MUTED, fontSize: 13 }}>
-                      No products match your search.
-                    </td>
+                    {['Product', 'SKU / Barcode', 'Category', 'Supplier', 'Price', 'Status', ''].map((h, i) => (
+                      <th key={h} style={{ ...thStyle, textAlign: i >= 4 ? 'right' : 'left' }}>{h}</th>
+                    ))}
                   </tr>
-                )}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {filteredProducts.map((p) => (
+                    <tr key={p.id}
+                      onMouseEnter={(e) => (e.currentTarget.style.background = BG_BASE)}
+                      onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}>
+                      <td style={{ ...tdStyle, color: TEXT_PRIMARY, fontWeight: 600 }}>{p.name}</td>
+                      <td style={tdStyle}>
+                        <div style={{ fontFamily: 'monospace', fontSize: 12, color: TEXT_SECONDARY }}>{p.sku}</div>
+                        {p.barcode && <div style={{ fontSize: 11, color: TEXT_MUTED, marginTop: 2 }}>{p.barcode}</div>}
+                      </td>
+                      <td style={{ ...tdStyle, color: TEXT_SECONDARY }}>{categoryName(p.categoryId)}</td>
+                      <td style={{ ...tdStyle, color: TEXT_SECONDARY }}>{supplierName(p.supplierId)}</td>
+                      <td style={{ ...tdStyle, color: TEXT_PRIMARY, fontWeight: 700, textAlign: 'right' }}>{peso(p.price)}</td>
+                      <td style={{ ...tdStyle, textAlign: 'right' }}>
+                        <span style={{
+                          fontSize: 10, fontWeight: 700, padding: '3px 10px', borderRadius: 20,
+                          background: p.status === 'active' ? SUCCESS_DIM : 'rgba(100,116,139,0.15)',
+                          color: p.status === 'active' ? SUCCESS : TEXT_MUTED,
+                        }}>
+                          {p.status === 'active' ? 'Active' : 'Inactive'}
+                        </span>
+                      </td>
+                      <td style={{ ...tdStyle, textAlign: 'right' }}>
+                        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 6 }}>
+                          <button
+                            onClick={() => { setEditingProduct(p); setProductModal(true) }}
+                            style={{ background: 'none', border: `1px solid ${BORDER}`, borderRadius: 6, padding: '4px 10px', fontSize: 12, color: TEXT_SECONDARY, cursor: 'pointer' }}>
+                            Edit
+                          </button>
+                          <button
+                            onClick={() => toggleProductStatus.mutate(p)}
+                            style={{
+                              background: 'none',
+                              border: `1px solid ${p.status === 'active' ? 'rgba(248,113,113,0.4)' : 'rgba(52,211,153,0.4)'}`,
+                              borderRadius: 6, padding: '4px 10px', fontSize: 12,
+                              color: p.status === 'active' ? DANGER : SUCCESS,
+                              cursor: 'pointer',
+                            }}>
+                            {p.status === 'active' ? 'Deactivate' : 'Activate'}
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                  {filteredProducts.length === 0 && (
+                    <tr>
+                      <td colSpan={7} style={{ padding: 48, textAlign: 'center', color: TEXT_MUTED, fontSize: 13 }}>
+                        {search || categoryFilter ? 'No products match your filters.' : 'No products yet. Add one to get started.'}
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            )}
           </div>
         </div>
       )}
 
-      {/* ── Categories Tab ── */}
+      {/* ── Categories ── */}
       {tab === 'categories' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-            <button
-              onClick={() => { setEditingCategory(null); setCategoryModalOpen(true); }}
-              style={{ background: ACCENT, color: '#fff', border: 'none', borderRadius: 8, padding: '10px 18px', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}
-            >
+            <button onClick={() => { setEditingCategory(null); setCategoryModal(true) }}
+              style={{ background: ACCENT, color: '#fff', border: 'none', borderRadius: 8, padding: '10px 18px', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>
               + Add category
             </button>
           </div>
@@ -338,32 +639,33 @@ export default function InventoryPage() {
                     </td>
                     <td style={{ ...tdStyle, textAlign: 'right' }}>
                       <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 6 }}>
-                        <button
-                          onClick={() => { setEditingCategory(c); setCategoryModalOpen(true); }}
-                          style={{ background: 'none', border: `1px solid ${BORDER}`, borderRadius: 6, padding: '4px 10px', fontSize: 12, color: TEXT_SECONDARY, cursor: 'pointer' }}
-                        >Edit</button>
-                        <button
-                          onClick={() => handleDeleteCategory(c.id)}
-                          style={{ background: 'none', border: '1px solid rgba(248,113,113,0.4)', borderRadius: 6, padding: '4px 10px', fontSize: 12, color: DANGER, cursor: 'pointer' }}
-                        >Delete</button>
+                        <button onClick={() => { setEditingCategory(c); setCategoryModal(true) }}
+                          style={{ background: 'none', border: `1px solid ${BORDER}`, borderRadius: 6, padding: '4px 10px', fontSize: 12, color: TEXT_SECONDARY, cursor: 'pointer' }}>
+                          Edit
+                        </button>
+                        <button onClick={() => handleDeleteCategory(c)}
+                          style={{ background: 'none', border: '1px solid rgba(248,113,113,0.4)', borderRadius: 6, padding: '4px 10px', fontSize: 12, color: DANGER, cursor: 'pointer' }}>
+                          Delete
+                        </button>
                       </div>
                     </td>
                   </tr>
                 ))}
+                {categories.length === 0 && (
+                  <tr><td colSpan={4} style={{ padding: 48, textAlign: 'center', color: TEXT_MUTED, fontSize: 13 }}>No categories yet.</td></tr>
+                )}
               </tbody>
             </table>
           </div>
         </div>
       )}
 
-      {/* ── Suppliers Tab ── */}
+      {/* ── Suppliers ── */}
       {tab === 'suppliers' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-            <button
-              onClick={() => { setEditingSupplier(null); setSupplierModalOpen(true); }}
-              style={{ background: ACCENT, color: '#fff', border: 'none', borderRadius: 8, padding: '10px 18px', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}
-            >
+            <button onClick={() => { setEditingSupplier(null); setSupplierModal(true) }}
+              style={{ background: ACCENT, color: '#fff', border: 'none', borderRadius: 8, padding: '10px 18px', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>
               + Add supplier
             </button>
           </div>
@@ -382,51 +684,70 @@ export default function InventoryPage() {
                     onMouseEnter={(e) => (e.currentTarget.style.background = BG_BASE)}
                     onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}>
                     <td style={{ ...tdStyle, color: TEXT_PRIMARY, fontWeight: 600 }}>{s.name}</td>
-                    <td style={{ ...tdStyle, color: TEXT_SECONDARY }}>{s.contact}</td>
+                    <td style={{ ...tdStyle, color: TEXT_SECONDARY }}>{s.contact || '—'}</td>
                     <td style={{ ...tdStyle, color: TEXT_SECONDARY }}>{s.address || '—'}</td>
                     <td style={{ ...tdStyle, color: TEXT_SECONDARY, textAlign: 'right' }}>
                       {products.filter((p) => p.supplierId === s.id).length}
                     </td>
                     <td style={{ ...tdStyle, textAlign: 'right' }}>
                       <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 6 }}>
-                        <button
-                          onClick={() => { setEditingSupplier(s); setSupplierModalOpen(true); }}
-                          style={{ background: 'none', border: `1px solid ${BORDER}`, borderRadius: 6, padding: '4px 10px', fontSize: 12, color: TEXT_SECONDARY, cursor: 'pointer' }}
-                        >Edit</button>
-                        <button
-                          onClick={() => handleDeleteSupplier(s.id)}
-                          style={{ background: 'none', border: '1px solid rgba(248,113,113,0.4)', borderRadius: 6, padding: '4px 10px', fontSize: 12, color: DANGER, cursor: 'pointer' }}
-                        >Delete</button>
+                        <button onClick={() => { setEditingSupplier(s); setSupplierModal(true) }}
+                          style={{ background: 'none', border: `1px solid ${BORDER}`, borderRadius: 6, padding: '4px 10px', fontSize: 12, color: TEXT_SECONDARY, cursor: 'pointer' }}>
+                          Edit
+                        </button>
+                        <button onClick={() => handleDeleteSupplier(s)}
+                          style={{ background: 'none', border: '1px solid rgba(248,113,113,0.4)', borderRadius: 6, padding: '4px 10px', fontSize: 12, color: DANGER, cursor: 'pointer' }}>
+                          Delete
+                        </button>
                       </div>
                     </td>
                   </tr>
                 ))}
+                {suppliers.length === 0 && (
+                  <tr><td colSpan={5} style={{ padding: 48, textAlign: 'center', color: TEXT_MUTED, fontSize: 13 }}>No suppliers yet.</td></tr>
+                )}
               </tbody>
             </table>
           </div>
         </div>
       )}
 
-      <ProductFormModal
-        isOpen={productModalOpen}
-        onClose={() => setProductModalOpen(false)}
-        onSave={handleSaveProduct}
-        product={editingProduct}
-        categories={categories}
-        suppliers={suppliers}
-      />
-      <CategoryFormModal
-        isOpen={categoryModalOpen}
-        onClose={() => setCategoryModalOpen(false)}
-        onSave={handleSaveCategory}
-        category={editingCategory}
-      />
-      <SupplierFormModal
-        isOpen={supplierModalOpen}
-        onClose={() => setSupplierModalOpen(false)}
-        onSave={handleSaveSupplier}
-        supplier={editingSupplier}
+      {/* ── Modals ── */}
+      <Modal open={productModal} onClose={() => setProductModal(false)}
+        title={editingProduct ? 'Edit product' : 'Add product'}>
+        <ProductForm
+          product={editingProduct}
+          categories={categories}
+          suppliers={suppliers}
+          onSave={(data) => saveProduct.mutateAsync(data)}
+          onClose={() => setProductModal(false)}
+        />
+      </Modal>
+
+      <Modal open={categoryModal} onClose={() => setCategoryModal(false)}
+        title={editingCategory ? 'Edit category' : 'Add category'}>
+        <CategoryForm
+          category={editingCategory}
+          onSave={(data) => saveCategory.mutateAsync(data)}
+          onClose={() => setCategoryModal(false)}
+        />
+      </Modal>
+
+      <Modal open={supplierModal} onClose={() => setSupplierModal(false)}
+        title={editingSupplier ? 'Edit supplier' : 'Add supplier'}>
+        <SupplierForm
+          supplier={editingSupplier}
+          onSave={(data) => saveSupplier.mutateAsync(data)}
+          onClose={() => setSupplierModal(false)}
+        />
+      </Modal>
+
+      <ConfirmModal
+        open={confirmOpen}
+        message={confirmMsg}
+        onConfirm={confirmAction}
+        onCancel={() => setConfirmOpen(false)}
       />
     </div>
-  );
+  )
 }
