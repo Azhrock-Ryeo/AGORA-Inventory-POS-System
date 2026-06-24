@@ -64,25 +64,35 @@ export default function DashboardPage() {
   const navigate = useNavigate()
 
   const [orders, setOrders] = useState<Order[]>([])
+  const [recentOrders, setRecentOrders] = useState<Order[]>([])// add this new state
   const [stockLevels, setStockLevels] = useState<StockLevel[]>([])
   const [totalProducts, setTotalProducts] = useState(0)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
+   
+
   useEffect(() => {
     async function load() {
       try {
-        const [ordersRes, stockRes, productsRes] = await Promise.all([
-          api.get('/orders?limit=100'),
-          api.get('/stock/levels'),
-          api.get('/products'),
+        const today = new Date().toISOString().split('T')[0]
+
+        const [todayOrdersRes, recentRes, stockRes, productsRes] = await Promise.all([
+          api.get(`/orders?status=COMPLETED&limit=200`), // for stats + chart
+          api.get('/orders?limit=6'),                                   // for recent panel
+          api.get('/stock/levels?limit=50'),                            // paginated
+          api.get('/products?limit=1'),                                 // just need count
         ])
-        const o: Order[] = ordersRes.data?.data ?? ordersRes.data ?? []
+
+        const todayOrders: Order[] = todayOrdersRes.data?.data ?? todayOrdersRes.data ?? []
+        const recent: Order[] = recentRes.data?.data ?? recentRes.data ?? []
         const s: StockLevel[] = Array.isArray(stockRes.data) ? stockRes.data : stockRes.data?.data ?? []
-        const p = Array.isArray(productsRes.data) ? productsRes.data : productsRes.data?.data ?? productsRes.data?.products ?? []
-        setOrders(o)
+
+        setOrders(todayOrders)       // used for: todaySales, chart, topProducts
+        setRecentOrders(recent)      // used for: recent orders panel
         setStockLevels(s)
-        setTotalProducts(p.length)
+        const p = Array.isArray(productsRes.data) ? productsRes.data : productsRes.data?.data ?? []
+setTotalProducts(productsRes.data?.total ?? p.length)      // total count comes from pagination meta
       } catch {
         setError('Failed to load dashboard data.')
       } finally {
@@ -93,10 +103,8 @@ export default function DashboardPage() {
   }, [])
 
   // ── derived stats ───────────────────────────────────────────────────────────
-  const today = new Date().toDateString()
-  const todayCompleted = orders.filter(
-    (o) => o.status === 'COMPLETED' && new Date(o.created_at).toDateString() === today
-  )
+  
+  const todayCompleted = orders
   const todaySales = todayCompleted.reduce((s, o) => s + Number(o.total), 0)
   const lowStock = stockLevels.filter((s) => s.quantity <= s.low_stock_threshold)
 
@@ -225,10 +233,10 @@ export default function DashboardPage() {
             </button>
           </div>
           <div>
-            {orders.slice(0, 6).length === 0 ? (
+            {recentOrders.length === 0 ? (
               <div style={{ padding: '32px', textAlign: 'center', color: '#475569', fontSize: 13 }}>No orders yet.</div>
             ) : (
-              orders.slice(0, 6).map((o) => (
+              recentOrders.map((o) => (
                 <div key={o.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 20px', borderBottom: '1px solid #1e293b' }}>
                   <div>
                     <div style={{ color: '#e2e8f0', fontSize: 13, fontWeight: 600 }}>#{o.id.slice(-6).toUpperCase()}</div>
