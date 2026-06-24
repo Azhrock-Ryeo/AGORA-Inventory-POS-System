@@ -96,14 +96,27 @@ export async function stockOut(req: Request, res: Response) {
 
 export async function getStockLevels(req: Request, res: Response) {
   try {
+    const { page = 1, limit = 50, low_stock } = req.query
+
+    const where: any = {
+      product: { status: 'ACTIVE' }, // skip inactive products
+    }
+
+    // If dashboard only needs low stock count, support ?low_stock=true
+    if (low_stock === 'true') {
+      where.quantity = { lte: prisma.stockLevel.fields.low_stock_threshold }
+    }
+
     const levels = await prisma.stockLevel.findMany({
+      where,
       include: {
-        product: {
-          select: { id: true, name: true, sku: true, status: true },
-        },
+        product: { select: { id: true, name: true, sku: true, status: true } },
       },
       orderBy: { product: { name: 'asc' } },
+      skip: (Number(page) - 1) * Number(limit),
+      take: Number(limit),
     })
+
     res.json(levels)
   } catch (err) {
     res.status(500).json({ message: 'Failed to fetch stock levels' })
