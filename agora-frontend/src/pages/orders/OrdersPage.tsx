@@ -9,8 +9,8 @@ interface Product {
   barcode: string
   price: number
   status: string
-  stock_levels?: { quantity: number }
-  categories?: { name: string }
+  stock_level?: { quantity: number }
+  category?: { name: string }
 }
 
 interface CartItem {
@@ -289,7 +289,7 @@ export default function OrdersPage() {
               }}
             >
               {products.map((product) => {
-                const stock = product.stock_levels?.quantity ?? 0
+                const stock = product.stock_level?.quantity ?? 0
                 const outOfStock = stock <= 0
                 return (
                   <button
@@ -314,7 +314,7 @@ export default function OrdersPage() {
                     }}
                   >
                     <div style={{ fontSize: 11, color: TEXT_MUTED, marginBottom: 4 }}>
-                      {product.categories?.name ?? 'Uncategorized'}
+                      {product.category?.name ?? 'Uncategorized'}
                     </div>
                     <div
                       style={{
