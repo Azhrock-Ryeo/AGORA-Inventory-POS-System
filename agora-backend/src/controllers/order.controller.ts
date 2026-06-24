@@ -76,17 +76,33 @@ export async function createOrder(req: Request, res: Response) {
 
 export async function getOrders(req: Request, res: Response) {
   try {
-    const { status, page = 1, limit = 20 } = req.query
-    const where = { ...(status && { status: String(status) as any }) }
+    const { status, page = 1, limit = 20, date } = req.query
+    const where: any = {}
+    if (status) where.status = String(status)
+    if (date) {
+      const start = new Date(String(date))
+      const end = new Date(start)
+      end.setDate(end.getDate() + 1)
+      where.created_at = { gte: start, lt: end }
+    }
 
-    const orders = await prisma.order.findMany({
-      where,
-      include: { cashier: { select: { id: true, name: true } }, items: true },
-      skip: (Number(page) - 1) * Number(limit),
-      take: Number(limit),
-      orderBy: { created_at: 'desc' },
-    })
-    const total = await prisma.order.count({ where })
+    const [orders, total] = await Promise.all([
+      prisma.order.findMany({
+        where,
+        include: {
+          cashier: { select: { id: true, name: true } },
+          items: {
+            include: {
+              product: { select: { id: true, name: true } }, // ← add this
+            },
+          },
+        },
+        skip: (Number(page) - 1) * Number(limit),
+        take: Number(limit),
+        orderBy: { created_at: 'desc' },
+      }),
+      prisma.order.count({ where }), // ← run count in parallel
+    ])
 
     res.json({ data: orders, total, page: Number(page), limit: Number(limit) })
   } catch (err) {
