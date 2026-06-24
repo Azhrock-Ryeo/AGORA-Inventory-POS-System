@@ -120,14 +120,17 @@ console.log('✅ Admin, Manager, Cashier seeded')
     })
 
     await prisma.stockLevel.upsert({
-      where:  { product_id: product.id },
-      update: {},
-      create: {
-        product_id:          product.id,
-        quantity:            qty,
-        low_stock_threshold: threshold,
-      },
-    })
+  where:  { product_id: product.id },
+  update: {             // ← now it will reset stock on reseed
+    quantity:            qty,
+    low_stock_threshold: threshold,
+  },
+  create: {
+    product_id:          product.id,
+    quantity:            qty,
+    low_stock_threshold: threshold,
+  },
+})
   }
   console.log('✅ Products + Stock Levels seeded')
 }
