@@ -46,6 +46,12 @@ enum AuditAction {
   CREATE
   UPDATE
   DELETE
+  LOGIN
+  LOGOUT
+  EXPORT
+  VOID
+  ADJUST
+  FAILED
 }
 
 // ─── MODELS ──────────────────────────────────────────
@@ -217,17 +223,22 @@ model Transaction {
 // entity_id holds that record's id.
 
 model AuditLog {
-  id           String      @id @default(uuid())
-  entity_type  String
-  entity_id    String
-  action       AuditAction
-  performed_by String
-  old_value    Json?
-  new_value    Json?
-  created_at   DateTime    @default(now())
+  id          String      @id @default(uuid())
+  user_id     String?
+  username    String?
+  user_role   String?
+  module      String
+  action      AuditAction
+  description String
+  old_value   String?
+  new_value   String?
+  ip_address  String?
+  status      String      @default("Success")
+  created_at  DateTime    @default(now())
 
-  @@index([entity_type, entity_id])
-  @@index([performed_by])
+  @@index([user_id])
+  @@index([module])
+  @@index([action])
   @@index([created_at])
 }
 

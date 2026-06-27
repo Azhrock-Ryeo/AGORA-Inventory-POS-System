@@ -16,6 +16,7 @@ import transactionRoutes from './routes/transaction.routes'
 import userRoutes from './routes/user.routes'
 import reportRoutes from './routes/report.routes'
 import cookieParser from 'cookie-parser'
+import auditLogRoutes from './routes/auditLog.routes'
 
 dotenv.config()
 
@@ -88,6 +89,8 @@ app.use('/api/orders', orderRoutes)
 app.use('/api/transactions', transactionRoutes)
 app.use('/api/users', userRoutes)
 app.use('/api/reports', reportRoutes)
+app.use('/api/audit-logs', auditLogRoutes)
+
 
 const PORT = process.env.PORT || 3000
 httpServer.listen(PORT, () => {

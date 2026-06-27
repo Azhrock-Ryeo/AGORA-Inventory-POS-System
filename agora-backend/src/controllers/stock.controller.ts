@@ -1,7 +1,8 @@
 import { Request, Response } from 'express'
 import prisma from '../utils/prisma'
 import { getCache, setCache, invalidateCache, invalidateCachePattern } from '../utils/redis'
-import { emitStockUpdate, emitLowStockAlert } from '../utils/socketEmitter'
+import { emitStockUpdate } from '../utils/socketEmitter'
+import { dispatchLowStockAlert } from '../utils/notificationService'
 
 export async function stockIn(req: Request, res: Response) {
   try {
@@ -104,14 +105,13 @@ export async function stockOut(req: Request, res: Response) {
 
     const isLowStock = newQty <= low_stock_threshold
     if (isLowStock) {
-      emitLowStockAlert(
-        product_id,
-        product?.name ?? product_id,
-        newQty,
-        low_stock_threshold
-      )
-      console.log(`[LOW STOCK] Product ${product_id} is at ${newQty} units (threshold: ${low_stock_threshold})`)
-    }
+  await dispatchLowStockAlert(
+    product_id,
+    product?.name ?? product_id,
+    newQty,
+    result.stockLevel.low_stock_threshold
+  )
+}
 
     if (newQty < high_stock_threshold) {
       await invalidateCache(`alert:stock:${product_id}`)
