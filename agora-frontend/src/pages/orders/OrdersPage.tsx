@@ -98,7 +98,7 @@ export default function OrdersPage() {
   const { data: products = [] } = useQuery<Product[]>({
     queryKey: ['products', search],
     queryFn: async () => {
-      const res = await api.get('/products', { params: { search, status: 'active' } })
+      const res = await api.get('/products', { params: { search, status: 'ACTIVE' } })
       return res.data?.data ?? res.data ?? []
     },
   })
@@ -868,158 +868,104 @@ export default function OrdersPage() {
       )}
 
       {/* ── Receipt Modal ── */}
-      {showReceipt && completedOrder && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'rgba(0,0,0,0.6)',
-            zIndex: 50,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: 16,
-          }}
-        >
-          <div style={card({ padding: 28, width: '100%', maxWidth: 380 })}>
-            <div style={{ textAlign: 'center', marginBottom: 20 }}>
-              <div
-                style={{
-                  width: 52,
-                  height: 52,
-                  borderRadius: '50%',
-                  background: SUCCESS_DIM,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  margin: '0 auto 10px',
-                  fontSize: 24,
-                }}
-              >
-                ✓
-              </div>
-              <h2 style={{ color: TEXT_PRIMARY, fontSize: 18, fontWeight: 700, margin: 0 }}>
-                Payment Received
-              </h2>
-              <p style={{ color: TEXT_MUTED, fontSize: 11, fontFamily: 'monospace', marginTop: 4 }}>
-                #{completedOrder.id.slice(-8).toUpperCase()}
-              </p>
-            </div>
-            <div
-              style={{
-                borderTop: `1px dashed ${BORDER}`,
-                padding: '16px 0',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: 6,
-              }}
-            >
-              {/* FIX: use getOrderItems() to safely read items regardless of key name */}
-              {getOrderItems(completedOrder).map((item, i) => (
-                <div
-                  key={i}
-                  style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: TEXT_SECONDARY }}
-                >
-                  <span>
-                    {item.product.name} × {item.quantity}
-                  </span>
-                  <span>{peso(Number(item.unit_price) * item.quantity)}</span>
-                </div>
-              ))}
-            </div>
-            <div
-              style={{
-                borderTop: `1px dashed ${BORDER}`,
-                paddingTop: 14,
-                display: 'flex',
-                flexDirection: 'column',
-                gap: 6,
-              }}
-            >
-              {completedOrder.discount > 0 && (
-                <div
-                  style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: SUCCESS }}
-                >
-                  <span>Discount</span>
-                  <span>−{peso(completedOrder.discount)}</span>
-                </div>
-              )}
-              <div
-                style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  fontSize: 16,
-                  fontWeight: 800,
-                  color: TEXT_PRIMARY,
-                }}
-              >
-                <span>Total</span>
-                <span>{peso(completedOrder.total)}</span>
-              </div>
-              <div
-                style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: TEXT_SECONDARY }}
-              >
-                <span>Paid</span>
-                <span>{peso(receiptAmountPaid)}</span>
-              </div>
-              <div
-                style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  fontSize: 13,
-                  fontWeight: 700,
-                  color: SUCCESS,
-                }}
-              >
-                <span>Change</span>
-                <span>{peso(receiptChange)}</span>
-              </div>
-            </div>
-            <div
-              style={{
-                display: 'flex',
-                gap: 10,
-                marginTop: 20,
-                paddingTop: 16,
-                borderTop: `1px solid ${BORDER}`,
-              }}
-            >
-              <button
-                onClick={() => window.print()}
-                style={{
-                  flex: 1,
-                  background: 'none',
-                  border: `1px solid ${BORDER}`,
-                  borderRadius: 8,
-                  padding: '12px',
-                  color: TEXT_SECONDARY,
-                  fontSize: 13,
-                  cursor: 'pointer',
-                }}
-              >
-                Print
-              </button>
-              <button
-                onClick={handleNewOrder}
-                style={{
-                  flex: 1,
-                  background: ACCENT,
-                  border: 'none',
-                  borderRadius: 8,
-                  padding: '12px',
-                  color: '#fff',
-                  fontSize: 13,
-                  fontWeight: 700,
-                  cursor: 'pointer',
-                }}
-              >
-                New Order
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+{showReceipt && completedOrder && (
+  <div
+    style={{
+      position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)',
+      zIndex: 50, display: 'flex', alignItems: 'center',
+      justifyContent: 'center', padding: 16,
+    }}
+  >
+    <div style={card({ padding: 28, width: '100%', maxWidth: 380 })}>
 
+      {/* Store Header */}
+      <div style={{ textAlign: 'center', marginBottom: 16 }}>
+        <div style={{ fontSize: 20, fontWeight: 800, color: ACCENT, letterSpacing: '0.05em' }}>
+          AGORA
+        </div>
+        <div style={{ fontSize: 11, color: TEXT_MUTED, marginTop: 2 }}>
+          Inventory &amp; POS System
+        </div>
+        <div style={{ marginTop: 12, width: 40, height: 40, borderRadius: '50%', background: SUCCESS_DIM,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          margin: '12px auto 6px', fontSize: 20 }}>
+          ✓
+        </div>
+        <h2 style={{ color: TEXT_PRIMARY, fontSize: 16, fontWeight: 700, margin: '4px 0 0' }}>
+          Payment Received
+        </h2>
+      </div>
+
+      {/* Order meta */}
+      <div style={{ borderTop: `1px dashed ${BORDER}`, padding: '12px 0', display: 'flex', flexDirection: 'column', gap: 4 }}>
+        {[
+          { label: 'Order #', value: `#${completedOrder.id.slice(-8).toUpperCase()}` },
+          { label: 'Date', value: new Date(completedOrder.created_at ?? Date.now()).toLocaleString('en-PH') },
+          { label: 'Cashier', value: completedOrder.cashier?.name ?? '—' },
+        ].map(({ label, value }) => (
+          <div key={label} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: TEXT_MUTED }}>
+            <span>{label}</span>
+            <span style={{ color: TEXT_SECONDARY }}>{value}</span>
+          </div>
+        ))}
+      </div>
+
+      {/* Items */}
+      <div style={{ borderTop: `1px dashed ${BORDER}`, padding: '12px 0', display: 'flex', flexDirection: 'column', gap: 6 }}>
+        {getOrderItems(completedOrder).map((item, i) => (
+          <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: TEXT_SECONDARY }}>
+            <span>{item.product.name} × {item.quantity}</span>
+            <span>{peso(Number(item.unit_price) * item.quantity)}</span>
+          </div>
+        ))}
+      </div>
+
+      {/* Totals */}
+      <div style={{ borderTop: `1px dashed ${BORDER}`, paddingTop: 12, display: 'flex', flexDirection: 'column', gap: 6 }}>
+        {completedOrder.discount > 0 && (
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: SUCCESS }}>
+            <span>Discount</span>
+            <span>−{peso(completedOrder.discount)}</span>
+          </div>
+        )}
+        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 16, fontWeight: 800, color: TEXT_PRIMARY }}>
+          <span>Total</span>
+          <span>{peso(completedOrder.total)}</span>
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: TEXT_SECONDARY }}>
+          <span>Paid</span>
+          <span>{peso(receiptAmountPaid)}</span>
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, fontWeight: 700, color: SUCCESS }}>
+          <span>Change</span>
+          <span>{peso(receiptChange)}</span>
+        </div>
+      </div>
+
+      {/* Footer */}
+      <div style={{ borderTop: `1px dashed ${BORDER}`, marginTop: 14, paddingTop: 12, textAlign: 'center' }}>
+        <div style={{ fontSize: 12, color: TEXT_MUTED }}>Thank you for shopping!</div>
+        <div style={{ fontSize: 11, color: TEXT_MUTED, marginTop: 2 }}>Please come again 🙂</div>
+      </div>
+
+      {/* Actions */}
+      <div style={{ display: 'flex', gap: 10, marginTop: 20, paddingTop: 16, borderTop: `1px solid ${BORDER}` }}>
+        <button
+          onClick={() => window.print()}
+          style={{ flex: 1, background: 'none', border: `1px solid ${BORDER}`, borderRadius: 8,
+            padding: '12px', color: TEXT_SECONDARY, fontSize: 13, cursor: 'pointer' }}>
+          Print
+        </button>
+        <button
+          onClick={handleNewOrder}
+          style={{ flex: 1, background: ACCENT, border: 'none', borderRadius: 8,
+            padding: '12px', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>
+          New Order
+        </button>
+      </div>
+    </div>
+  </div>
+)}
       {/* ── Order Detail Modal ── */}
       {showOrderDetail && selectedOrder && (
         <div

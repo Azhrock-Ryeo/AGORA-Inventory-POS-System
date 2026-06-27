@@ -260,7 +260,9 @@ function SupplierForm({ supplier, onSave, onClose }: {
 }) {
   const [form, setForm] = useState({
     name: supplier?.name ?? '',
-    contact: supplier?.contact ?? '',
+    contact_name: (supplier as any)?.contact_name ?? '',
+    email: (supplier as any)?.email ?? '',
+    phone: (supplier as any)?.phone ?? '',
     address: supplier?.address ?? '',
   })
   const [loading, setLoading] = useState(false)
@@ -282,8 +284,14 @@ function SupplierForm({ supplier, onSave, onClose }: {
       <Field label="Supplier name">
         <input style={inputBase} value={form.name} onChange={set('name')} placeholder="e.g. Unilever Philippines" />
       </Field>
-      <Field label="Contact">
-        <input style={inputBase} value={form.contact} onChange={set('contact')} placeholder="Phone or email" />
+      <Field label="Contact name">
+        <input style={inputBase} value={form.contact_name} onChange={set('contact_name')} placeholder="e.g. Juan dela Cruz" />
+      </Field>
+      <Field label="Email">
+        <input style={inputBase} type="email" value={form.email} onChange={set('email')} placeholder="e.g. supplier@email.com" />
+      </Field>
+      <Field label="Phone">
+        <input style={inputBase} value={form.phone} onChange={set('phone')} placeholder="e.g. +63 917 123 4567" />
       </Field>
       <Field label="Address (optional)">
         <textarea style={{ ...inputBase, resize: 'vertical', minHeight: 72 }} value={form.address} onChange={set('address')} placeholder="Business address…" />
@@ -393,11 +401,12 @@ export default function InventoryPage() {
   })
 
   const toggleProductStatus = useMutation({
-    mutationFn: async (product: Product) => {
-      await api.put(`/products/${product.id}`, {
-        status: product.status === 'active' ? 'INACTIVE' : 'ACTIVE',
-      })
-    },
+  mutationFn: async (product: Product) => {
+    const currentStatus = (product as any).status?.toUpperCase()
+    await api.put(`/products/${product.id}`, {
+      status: currentStatus === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE',
+    })
+  },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['products'] }),
   })
 
@@ -435,22 +444,22 @@ export default function InventoryPage() {
 
   // ── Delete guards ─────────────────────────────────────────────────────────
   const handleDeleteCategory = (c: Category) => {
-    const inUse = products.some((p) => p.categoryId === c.id)
-    if (inUse) {
-      askConfirm(
-        `"${c.name}" is assigned to ${products.filter((p) => p.categoryId === c.id).length} product(s). Reassign those products before deleting.`,
-        () => setConfirmOpen(false)
-      )
-      return
-    }
-    askConfirm(`Delete category "${c.name}"? This cannot be undone.`, () => {
-      deleteCategory.mutate(c.id)
-      setConfirmOpen(false)
-    })
+  const inUse = products.some((p) => (p as any).category_id === c.id)
+  if (inUse) {
+    askConfirm(
+      `"${c.name}" is assigned to ${products.filter((p) => (p as any).category_id === c.id).length} product(s). Reassign those products before deleting.`,
+      () => setConfirmOpen(false)
+    )
+    return
   }
+  askConfirm(`Delete category "${c.name}"? This cannot be undone.`, () => {
+    deleteCategory.mutate(c.id)
+    setConfirmOpen(false)
+  })
+}
 
   const handleDeleteSupplier = (s: Supplier) => {
-    const inUse = products.some((p) => p.supplierId === s.id)
+    const inUse = products.some((p) => (p as any).supplier_id === s.id)
     if (inUse) {
       askConfirm(
         `"${s.name}" is linked to ${products.filter((p) => p.supplierId === s.id).length} product(s). Reassign those products before deleting.`,
@@ -472,13 +481,10 @@ export default function InventoryPage() {
         p.name.toLowerCase().includes(q) ||
         p.sku.toLowerCase().includes(q) ||
         (p.barcode ?? '').includes(search)
-      const matchCat = !categoryFilter || p.categoryId === categoryFilter
+      const matchCat = !categoryFilter || (p as any).category_id === categoryFilter
       return matchSearch && matchCat
     })
   }, [products, search, categoryFilter])
-
-  const categoryName = (id: string) => categories.find((c) => c.id === id)?.name ?? '—'
-  const supplierName = (id: string) => suppliers.find((s) => s.id === id)?.name ?? '—'
 
   const TABS: Tab[] = ['products', 'categories', 'suppliers']
 
@@ -571,16 +577,16 @@ export default function InventoryPage() {
                         <div style={{ fontFamily: 'monospace', fontSize: 12, color: TEXT_SECONDARY }}>{p.sku}</div>
                         {p.barcode && <div style={{ fontSize: 11, color: TEXT_MUTED, marginTop: 2 }}>{p.barcode}</div>}
                       </td>
-                      <td style={{ ...tdStyle, color: TEXT_SECONDARY }}>{categoryName(p.categoryId)}</td>
-                      <td style={{ ...tdStyle, color: TEXT_SECONDARY }}>{supplierName(p.supplierId)}</td>
+                      <td style={{ ...tdStyle, color: TEXT_SECONDARY }}>{(p as any).category?.name ?? '—'}</td>
+                      <td style={{ ...tdStyle, color: TEXT_SECONDARY }}>{(p as any).supplier?.name ?? '—'}</td>
                       <td style={{ ...tdStyle, color: TEXT_PRIMARY, fontWeight: 700, textAlign: 'right' }}>{peso(p.price)}</td>
                       <td style={{ ...tdStyle, textAlign: 'right' }}>
                         <span style={{
                           fontSize: 10, fontWeight: 700, padding: '3px 10px', borderRadius: 20,
-                          background: p.status === 'ACTIVE' ? SUCCESS_DIM : 'rgba(100,116,139,0.15)',
-                          color: p.status === 'ACTIVE' ? SUCCESS : TEXT_MUTED,
+                          background: p.status?.toUpperCase() === 'ACTIVE' ? SUCCESS_DIM : 'rgba(100,116,139,0.15)',
+                          color: p.status?.toUpperCase() === 'ACTIVE' ? SUCCESS : TEXT_MUTED,
                         }}>
-                          {p.status === 'ACTIVE' ? 'Active' : 'Inactive'}
+                          {p.status?.toUpperCase() === 'ACTIVE' ? 'Active' : 'Inactive'}
                         </span>
                       </td>
                       <td style={{ ...tdStyle, textAlign: 'right' }}>
@@ -594,12 +600,12 @@ export default function InventoryPage() {
                             onClick={() => toggleProductStatus.mutate(p)}
                             style={{
                               background: 'none',
-                              border: `1px solid ${p.status === 'ACTIVE' ? 'rgba(248,113,113,0.4)' : 'rgba(52,211,153,0.4)'}`,
+                              border: `1px solid ${p.status?.toUpperCase() === 'ACTIVE' ? 'rgba(248,113,113,0.4)' : 'rgba(52,211,153,0.4)'}`,
                               borderRadius: 6, padding: '4px 10px', fontSize: 12,
-                              color: p.status === 'ACTIVE' ? DANGER : SUCCESS,
+                              color: p.status?.toUpperCase() === 'ACTIVE' ? DANGER : SUCCESS,
                               cursor: 'pointer',
                             }}>
-                            {p.status === 'ACTIVE' ? 'Deactivate' : 'Activate'}
+                            {p.status?.toUpperCase() === 'ACTIVE' ? 'Deactivate' : 'Activate'}
                           </button>
                         </div>
                       </td>
@@ -694,7 +700,7 @@ export default function InventoryPage() {
                     onMouseEnter={(e) => (e.currentTarget.style.background = BG_BASE)}
                     onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}>
                     <td style={{ ...tdStyle, color: TEXT_PRIMARY, fontWeight: 600 }}>{s.name}</td>
-                    <td style={{ ...tdStyle, color: TEXT_SECONDARY }}>{s.contact || '—'}</td>
+                    <td style={{ ...tdStyle, color: TEXT_SECONDARY }}>{(s as any).contact_name || '—'}</td>
                     <td style={{ ...tdStyle, color: TEXT_SECONDARY }}>{s.address || '—'}</td>
                     <td style={{ ...tdStyle, color: TEXT_SECONDARY, textAlign: 'right' }}>
                       {products.filter((p) => p.supplierId === s.id).length}

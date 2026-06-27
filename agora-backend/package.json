@@ -18,6 +18,7 @@
   "type": "commonjs",
   "devDependencies": {
     "@types/bcryptjs": "^2.4.6",
+    "@types/cookie-parser": "^1.4.10",
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
     "@types/jsonwebtoken": "^9.0.10",
@@ -45,6 +46,7 @@
     "chart.js": "^4.5.1",
     "chokidar": "^3.6.0",
     "confbox": "^0.2.4",
+    "cookie-parser": "^1.4.7",
     "cors": "^2.8.6",
     "create-require": "^1.1.1",
     "cross-spawn": "^7.0.6",

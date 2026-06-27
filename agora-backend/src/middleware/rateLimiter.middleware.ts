@@ -5,9 +5,9 @@ import { Request, Response, NextFunction } from 'express'
 const loginLimiter = new RateLimiterRedis({
   storeClient: redis,
   keyPrefix: 'rl:login',
-  points: 5,
+  points: 50,         // ← was 5
   duration: 900,
-  blockDuration: 900,
+  blockDuration: 60,  // ← was 900 (now 1 min instead of 15)
 })
 
 const apiLimiter = new RateLimiterRedis({

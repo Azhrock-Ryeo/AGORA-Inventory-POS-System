@@ -57,7 +57,7 @@ interface StockLevel {
 interface StockMovement {
   id: string
   product_id: string
-  type: 'in' | 'out'
+  type: 'STOCK_IN' | 'STOCK_OUT'
   quantity: number
   reason: string
   user_id: string
@@ -89,7 +89,7 @@ export default function StockPage() {
   const [outSuccess, setOutSuccess] = useState(false)
 
   const [historySearch, setHistorySearch] = useState('')
-  const [historyType, setHistoryType] = useState<'all' | 'in' | 'out'>('all')
+  const [historyType, setHistoryType] = useState<'all' | 'STOCK_IN' | 'STOCK_OUT'>('all')
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
 
@@ -411,10 +411,10 @@ export default function StockPage() {
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'center' }}>
             <input type="text" value={historySearch} onChange={(e) => setHistorySearch(e.target.value)}
               placeholder="Search by product…" style={{ ...inputStyle, width: 220 }} />
-            <select value={historyType} onChange={(e) => setHistoryType(e.target.value as 'all' | 'in' | 'out')} style={{ ...inputStyle, width: 'auto' }}>
+            <select value={historyType} onChange={(e) => setHistoryType(e.target.value as 'all' | 'STOCK_IN' | 'STOCK_OUT')} style={{ ...inputStyle, width: 'auto' }}>
               <option value="all">All Types</option>
-              <option value="in">Stock In</option>
-              <option value="out">Stock Out</option>
+              <option value="STOCK_IN">Stock In</option>
+              <option value="STOCK_OUT">Stock Out</option>
             </select>
             <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} style={{ ...inputStyle, width: 'auto' }} />
             <span style={{ color: TEXT_MUTED, fontSize: 13 }}>to</span>
@@ -445,10 +445,10 @@ export default function StockPage() {
                       <td style={{ ...tdStyle }}>
                         <span style={{
                           fontSize: 10, fontWeight: 700, padding: '3px 10px', borderRadius: 20,
-                          background: m.type === 'in' ? SUCCESS_DIM : DANGER_DIM,
-                          color: m.type === 'in' ? SUCCESS : DANGER,
+                          background: m.type === 'STOCK_IN' ? SUCCESS_DIM : DANGER_DIM,
+                          color: m.type === 'STOCK_IN' ? SUCCESS : DANGER,
                         }}>
-                          {m.type === 'in' ? '↑ Stock In' : '↓ Stock Out'}
+                          {m.type === 'STOCK_IN' ? '↑ Stock In' : '↓ Stock Out'}
                         </span>
                       </td>
                       <td style={{ ...tdStyle, color: TEXT_PRIMARY, fontWeight: 700 }}>{m.quantity}</td>

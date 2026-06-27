@@ -8,9 +8,15 @@ interface User {
   id: string
   name: string
   email: string
-  role: Role
+  role: Role | { role_name: Role }
   is_active: boolean
   created_at: string
+}
+
+// helper to safely get role string
+const getRole = (u: User): Role => {
+  if (typeof u.role === 'object' && u.role !== null) return (u.role as any).role_name
+  return u.role as Role
 }
 
 interface FormState {
@@ -21,6 +27,7 @@ interface FormState {
 }
 
 const ROLES: Role[] = ['SUPER_ADMIN', 'ADMIN', 'MANAGER', 'CASHIER']
+
 
 const ROLE_STYLE: Record<Role, { bg: string; color: string }> = {
   SUPER_ADMIN: { bg: 'rgba(139,92,246,0.15)', color: '#a78bfa' },
@@ -59,8 +66,20 @@ export default function UsersPage() {
   const [error, setError] = useState('')
 
   // Only SUPER_ADMIN can see/assign the SUPER_ADMIN role
-  const availableRoles = ROLES.filter((r) => me?.role === 'SUPER_ADMIN' || r !== 'SUPER_ADMIN')
-
+  const availableRoles = ROLES.filter((r) => {
+      if (me?.role === 'SUPER_ADMIN') return r !== 'SUPER_ADMIN' // SA can create Admin and below
+      if (me?.role === 'ADMIN') return r !== 'SUPER_ADMIN' && r !== 'ADMIN' // Admin can create Manager and below
+      return false // Others can't create anyone
+    })
+const handleDelete = async (u: User) => {
+  if (!confirm(`Delete "${u.name}"? This cannot be undone.`)) return
+  try {
+    await api.delete(`/users/${u.id}`)
+    setUsers((prev) => prev.filter((x) => x.id !== u.id))
+  } catch (e: any) {
+    alert(e.response?.data?.message ?? 'Failed to delete user.')
+  }
+}
   const load = async () => {
     try {
       const res = await api.get('/users')
@@ -86,7 +105,7 @@ export default function UsersPage() {
     // Only SUPER_ADMIN can edit another SUPER_ADMIN
     if (u.role === 'SUPER_ADMIN' && me?.role !== 'SUPER_ADMIN') return
     setEditing(u)
-    setForm({ name: u.name, email: u.email, password: '', role: u.role })
+    setForm({ name: u.name, email: u.email, password: '', role: getRole(u) })
     setError('')
     setModalOpen(true)
   }
@@ -138,8 +157,12 @@ export default function UsersPage() {
 
       {/* Stats row */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
-        {ROLES.map((role) => {
-          const count = users.filter((u) => u.role === role).length
+        {ROLES.filter((role) => {
+          if (me?.role === 'SUPER_ADMIN') return role !== 'SUPER_ADMIN'
+          if (me?.role === 'ADMIN') return role !== 'SUPER_ADMIN' && role !== 'ADMIN'
+              return false
+        }).map((role) => {
+          const count = users.filter((u) => getRole(u) === role).length
           const s = ROLE_STYLE[role]
           return (
             <div key={role} style={{ ...card, padding: '16px 20px' }}>
@@ -169,9 +192,9 @@ export default function UsersPage() {
             </thead>
             <tbody>
               {users.map((u) => {
-                const rs = ROLE_STYLE[u.role]
+                const rs = ROLE_STYLE[getRole(u)]
                 const isMe = u.id === me?.id
-                const isSuperAdmin = u.role === 'SUPER_ADMIN'
+                const isSuperAdmin = getRole(u) === 'SUPER_ADMIN'
                 const canEdit = !isSuperAdmin || me?.role === 'SUPER_ADMIN'
                 // Cannot deactivate yourself, and cannot deactivate a Super Admin unless you are one
                 const canToggle = !isMe && (!isSuperAdmin || me?.role === 'SUPER_ADMIN')
@@ -188,7 +211,7 @@ export default function UsersPage() {
                     <td style={{ padding: '14px 20px', color: '#94a3b8', fontSize: 13 }}>{u.email}</td>
                     <td style={{ padding: '14px 20px' }}>
                       <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 20, background: rs.bg, color: rs.color }}>
-                        {u.role.replace('_', ' ')}
+                        {getRole(u).replace('_', ' ')}
                       </span>
                     </td>
                     <td style={{ padding: '14px 20px' }}>
@@ -205,12 +228,22 @@ export default function UsersPage() {
                           <button onClick={() => openEdit(u)} style={{ ...btnGhost, padding: '6px 14px', fontSize: 12 }}>Edit</button>
                         )}
                         {canToggle && (
-                          <button
-                            onClick={() => handleToggle(u)}
-                            style={{ ...btnGhost, padding: '6px 14px', fontSize: 12, color: u.is_active ? '#f87171' : '#34d399', borderColor: u.is_active ? 'rgba(248,113,113,0.3)' : 'rgba(52,211,153,0.3)' }}
-                          >
-                            {u.is_active ? 'Deactivate' : 'Activate'}
-                          </button>
+                          <>
+                            <button
+                              onClick={() => handleToggle(u)}
+                              style={{ ...btnGhost, padding: '6px 14px', fontSize: 12, color: u.is_active ? '#f87171' : '#34d399', borderColor: u.is_active ? 'rgba(248,113,113,0.3)' : 'rgba(52,211,153,0.3)' }}
+                            >
+                              {u.is_active ? 'Deactivate' : 'Activate'}
+                            </button>
+                            {me?.role === 'SUPER_ADMIN' && !isMe && !isSuperAdmin && (
+                              <button
+                                onClick={() => handleDelete(u)}
+                                style={{ ...btnGhost, padding: '6px 14px', fontSize: 12, color: '#f87171', borderColor: 'rgba(248,113,113,0.3)' }}
+                              >
+                                Delete
+                              </button>
+                            )}
+                          </>
                         )}
                       </div>
                     </td>
