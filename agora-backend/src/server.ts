@@ -15,23 +15,29 @@ import orderRoutes from './routes/order.routes'
 import transactionRoutes from './routes/transaction.routes'
 import userRoutes from './routes/user.routes'
 import reportRoutes from './routes/report.routes'
-import cookieParser from 'cookie-parser'
 import auditLogRoutes from './routes/auditLog.routes'
+import cookieParser from 'cookie-parser'
 
 dotenv.config()
 
 const app = express()
 const httpServer = http.createServer(app)
 
-// ── Socket.io (AGORA-096) ─────────────────────────────────────────────────────
+const allowedOrigins = [
+  process.env.FRONTEND_URL ?? 'http://localhost:5173',
+  'https://agora-frontend-weld.vercel.app',
+  'http://localhost:5173',
+]
+
+// ── Socket.io ─────────────────────────────────────────────────────────────────
 export const io = new Server(httpServer, {
   cors: {
-    origin: process.env.FRONTEND_URL || 'http://localhost:5173',
+    origin: allowedOrigins,
     credentials: true,
   },
 })
 
-// ── JWT auth handshake (AGORA-097) ────────────────────────────────────────────
+// ── JWT auth handshake ────────────────────────────────────────────────────────
 io.use((socket, next) => {
   const token = socket.handshake.auth?.token
   if (!token) return next(new Error('No token provided'))
@@ -48,16 +54,14 @@ io.use((socket, next) => {
   }
 })
 
-// ── AGORA-100: Admin + Manager room ──────────────────────────────────────────
+// ── Socket rooms ──────────────────────────────────────────────────────────────
 io.on('connection', (socket) => {
   console.log(`[Socket] Connected: ${socket.id} role=${socket.data.role}`)
-
   const role = socket.data.role
   if (role === 'ADMIN' || role === 'SUPER_ADMIN' || role === 'MANAGER') {
     socket.join('staff')
     console.log(`[Socket] ${socket.id} joined staff room`)
   }
-
   socket.on('disconnect', (reason) => {
     console.log(`[Socket] Disconnected: ${socket.id} reason=${reason}`)
   })
@@ -65,7 +69,13 @@ io.on('connection', (socket) => {
 
 // ── Express middleware ────────────────────────────────────────────────────────
 app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:5173',
+  origin: (origin, callback) => {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true)
+    } else {
+      callback(new Error('Not allowed by CORS'))
+    }
+  },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
@@ -90,7 +100,6 @@ app.use('/api/transactions', transactionRoutes)
 app.use('/api/users', userRoutes)
 app.use('/api/reports', reportRoutes)
 app.use('/api/audit-logs', auditLogRoutes)
-
 
 const PORT = process.env.PORT || 3000
 httpServer.listen(PORT, () => {
