@@ -31,19 +31,17 @@ function SessionBootstrap({ children }: { children: React.ReactNode }) {
   useSocket()
 
   useEffect(() => {
-    async function bootstrap() {
-      try {
-        // Refresh cookie (httpOnly) is sent automatically with credentials: 'include'.
-        const res = await api.post('/auth/refresh')
-        const { accessToken, user } = res.data
-        setAuth(user, accessToken)
-      } catch {
-        // No valid session — fine, user just sees the login page.
-        setInitializing(false)
-      }
+  async function bootstrap() {
+    try {
+      const res = await api.post('/auth/refresh')
+      const { accessToken, user } = res.data
+      setAuth(user, accessToken)
+    } catch {
+      setInitializing(false)
     }
-    bootstrap()
-  }, [])
+  }
+  bootstrap()
+}, [])
 
   return <>{children}</>
 }
