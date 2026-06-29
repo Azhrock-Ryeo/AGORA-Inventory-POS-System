@@ -1,17 +1,25 @@
 import { PrismaClient } from '@prisma/client'
 import bcrypt from 'bcryptjs'
 import { signAccessToken, signRefreshToken, verifyRefreshToken } from '../utils/jwt'
+import { redis } from '../utils/redis'
 
 const prisma = new PrismaClient()
 
-// NOTE: RefreshToken table is gone, so refresh tokens are now stateless JWTs —
-// validity is checked by signature + expiry only, not against the DB.
-// This means logout can no longer truly revoke a token server-side; it only
-// clears the cookie client-side. If the CEO needs hard revocation (e.g. for
-// stolen-token scenarios), we'd need a lightweight denylist table (just
-// token-id + expiry, not full refresh token storage) — flag this if it matters.
+const MAX_FAILED_ATTEMPTS = 5
+const LOCKOUT_DURATION = 15 * 60 // 15 minutes in seconds
 
 export async function loginUser(email: string, password: string) {
+  const lockKey = `lockout:${email}`
+  const attemptsKey = `attempts:${email}`
+
+  // check if account is locked
+  const isLocked = await redis.get(lockKey)
+  if (isLocked) {
+    const ttl = await redis.ttl(lockKey)
+    const minutes = Math.ceil(ttl / 60)
+    throw new Error(`Account locked. Try again in ${minutes} minute(s).`)
+  }
+
   const user = await prisma.user.findUnique({
     where: { email },
     include: { role: true },
@@ -22,9 +30,24 @@ export async function loginUser(email: string, password: string) {
   }
 
   const passwordMatches = await bcrypt.compare(password, user.password_hash)
+
   if (!passwordMatches) {
-    throw new Error('Invalid credentials')
+    // increment failed attempts
+    const attempts = await redis.incr(attemptsKey)
+    await redis.expire(attemptsKey, LOCKOUT_DURATION)
+
+    if (attempts >= MAX_FAILED_ATTEMPTS) {
+      await redis.setex(lockKey, LOCKOUT_DURATION, '1')
+      await redis.del(attemptsKey)
+      throw new Error(`Too many failed attempts. Account locked for 15 minutes.`)
+    }
+
+    throw new Error(`Invalid credentials. ${MAX_FAILED_ATTEMPTS - attempts} attempt(s) remaining.`)
   }
+
+  // clear failed attempts on successful login
+  await redis.del(attemptsKey)
+  await redis.del(lockKey)
 
   const payload = { userId: user.id, role: user.role.role_name }
   const accessToken = signAccessToken(payload)
@@ -54,6 +77,7 @@ export async function refreshUserToken(oldRefreshToken: string) {
     where: { id: payload.userId },
     include: { role: true },
   })
+
   if (!user || !user.is_active) {
     throw new Error('User not found or inactive')
   }
@@ -66,8 +90,5 @@ export async function refreshUserToken(oldRefreshToken: string) {
 }
 
 export async function logoutUser(_refreshToken: string) {
-  // Stateless tokens: nothing to delete server-side. Cookie clearing happens
-  // in the controller. This is a no-op placeholder in case a denylist gets
-  // added later.
   return
 }

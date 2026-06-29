@@ -3,5 +3,8 @@ module.exports = {
   testEnvironment: 'node',
   roots: ['<rootDir>/src'],
   testMatch: ['**/__tests__/**/*.test.ts', '**/tests/**/*.test.ts'],
-  clearMocks: true,  // ← was resetMocks: true
+  clearMocks: true,
+  moduleNameMapper: {
+    '^resend$': '<rootDir>/src/utils/__mocks__/resend.ts',
+  },
 }

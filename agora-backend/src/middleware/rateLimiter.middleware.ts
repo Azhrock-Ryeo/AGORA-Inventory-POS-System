@@ -2,20 +2,34 @@ import { RateLimiterRedis } from 'rate-limiter-flexible'
 import { redis } from '../utils/redis'
 import { Request, Response, NextFunction } from 'express'
 
-const loginLimiter = new RateLimiterRedis({
-  storeClient: redis,
-  keyPrefix: 'rl:login',
-  points: 50,         // ← was 5
-  duration: 900,
-  blockDuration: 60,  // ← was 900 (now 1 min instead of 15)
-})
+// Lazy initialization — avoids crash when redis isn't connected yet (e.g. during tests)
+let loginLimiter: RateLimiterRedis | null = null
+let apiLimiter: RateLimiterRedis | null = null
 
-const apiLimiter = new RateLimiterRedis({
-  storeClient: redis,
-  keyPrefix: 'rl:api',
-  points: 100,
-  duration: 60,
-})
+function getLoginLimiter(): RateLimiterRedis {
+  if (!loginLimiter) {
+    loginLimiter = new RateLimiterRedis({
+      storeClient: redis,
+      keyPrefix: 'rl:login',
+      points: 50,
+      duration: 900,
+      blockDuration: 60,
+    })
+  }
+  return loginLimiter
+}
+
+function getApiLimiter(): RateLimiterRedis {
+  if (!apiLimiter) {
+    apiLimiter = new RateLimiterRedis({
+      storeClient: redis,
+      keyPrefix: 'rl:api',
+      points: 100,
+      duration: 60,
+    })
+  }
+  return apiLimiter
+}
 
 export const loginRateLimiter = async (
   req: Request,
@@ -23,7 +37,7 @@ export const loginRateLimiter = async (
   next: NextFunction
 ): Promise<void> => {
   try {
-    await loginLimiter.consume(req.ip!)
+    await getLoginLimiter().consume(req.ip!)
     next()
   } catch {
     res.status(429).json({
@@ -40,7 +54,7 @@ export const apiRateLimiter = async (
 ): Promise<void> => {
   try {
     const key = (req as any).user?.userId ?? req.ip!
-    await apiLimiter.consume(key)
+    await getApiLimiter().consume(key)
     next()
   } catch {
     res.status(429).json({

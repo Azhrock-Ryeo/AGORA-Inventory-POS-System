@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import {
   BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid,
-  Tooltip, ResponsiveContainer, Legend,
+  Tooltip, ResponsiveContainer,
 } from 'recharts'
 import api from '../../services/api'
 
@@ -340,27 +340,27 @@ export default function ReportsPage() {
               </tr>
             </thead>
             <tbody>
-              {salesData.length === 0 ? (
-                <tr>
-                  <td colSpan={4} style={{ padding: '48px', textAlign: 'center', color: TEXT_MUTED, fontSize: 13 }}>
-                    No data for this period
-                  </td>
-                </tr>
-              ) : (
-                salesData.map((row, i) => (
-                  <tr key={i}
-                    onMouseEnter={(e) => (e.currentTarget.style.background = BG_BASE)}
-                    onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}>
-                    <td style={{ ...tdStyle, color: TEXT_PRIMARY, fontWeight: 600 }}>{row.label}</td>
-                    <td style={{ ...tdStyle, color: TEXT_SECONDARY, textAlign: 'right' }}>{row.orders ?? 0}</td>
-                    <td style={{ ...tdStyle, color: ACCENT, fontWeight: 700, textAlign: 'right' }}>{peso(row.revenue ?? 0)}</td>
-                    <td style={{ ...tdStyle, color: TEXT_SECONDARY, textAlign: 'right' }}>
-                      {row.orders ? peso((row.revenue ?? 0) / row.orders) : '—'}
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
+  {salesData.length === 0 ? (
+    <tr>
+      <td colSpan={4} style={{ padding: '48px', textAlign: 'center', color: TEXT_MUTED, fontSize: 13 }}>
+        No data for this period
+      </td>
+    </tr>
+  ) : (
+    salesData.map((row, i) => (
+      <tr key={i}
+        onMouseEnter={(e) => (e.currentTarget.style.background = BG_BASE)}
+        onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}>
+        <td style={{ ...tdStyle, color: TEXT_PRIMARY, fontWeight: 600 }}>{row.label}</td>
+        <td style={{ ...tdStyle, color: TEXT_SECONDARY, textAlign: 'right' }}>{row.orders ?? 0}</td>
+        <td style={{ ...tdStyle, color: ACCENT, fontWeight: 700, textAlign: 'right' }}>{peso(row.revenue ?? 0)}</td>
+        <td style={{ ...tdStyle, color: TEXT_SECONDARY, textAlign: 'right' }}>
+          {row.orders ? peso((row.revenue ?? 0) / row.orders) : '—'}
+        </td>
+      </tr>
+    ))
+  )}
+</tbody>
           </table>
         )}
       </div>
