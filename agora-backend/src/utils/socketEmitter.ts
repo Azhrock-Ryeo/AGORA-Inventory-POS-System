@@ -1,7 +1,12 @@
-import { io } from '../server'
+// src/utils/socketEmitter.ts
 
 export function emitStockUpdate(productId: string, productName: string, quantity: number) {
-  io.emit('stock-update', { productId, productName, quantity })
+  try {
+    const { io } = require('../server')
+    io.emit('stock-update', { productId, productName, quantity })
+  } catch {
+    // server not initialized yet (e.g. during tests) — skip silently
+  }
 }
 
 export function emitLowStockAlert(
@@ -10,5 +15,10 @@ export function emitLowStockAlert(
   quantity: number,
   threshold: number
 ) {
-  io.to('staff').emit('low-stock-alert', { productId, productName, quantity, threshold })
+  try {
+    const { io } = require('../server')
+    io.to('staff').emit('low-stock-alert', { productId, productName, quantity, threshold })
+  } catch {
+    // server not initialized yet — skip silently
+  }
 }

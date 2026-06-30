@@ -5,8 +5,14 @@ export async function createTransaction(req: Request, res: Response) {
   try {
     const { order_id, amount_paid, payment_method } = req.body
 
-    if (!order_id || amount_paid == null || !payment_method) {
-      return res.status(400).json({ message: 'order_id, amount_paid, and payment_method are required' })
+    if (!order_id) {
+      return res.status(400).json({ message: 'order_id is required' })
+    }
+    if (amount_paid == null) {
+      return res.status(400).json({ message: 'amount_paid is required' })
+    }
+    if (!payment_method) {
+      return res.status(400).json({ message: 'payment_method is required' })
     }
 
     const order = await prisma.order.findUnique({ where: { id: order_id } })
