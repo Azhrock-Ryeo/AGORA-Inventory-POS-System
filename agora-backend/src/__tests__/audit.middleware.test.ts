@@ -50,15 +50,18 @@ describe('auditLog middleware', () => {
     expect(prisma.auditLog.create).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
-          entity_type: 'Order Module',
+          module: 'Order Module',
           action: 'CREATE',
-          performed_by: 'user-001',
+          user_id: 'user-001',
+          user_role: 'ADMIN',
+          description: 'Created new order',
+          status: 'Success',
         }),
       })
     )
   })
 
-  it('logs an UPDATE action for the Product module with correct entity_id from params', async () => {
+  it('logs an UPDATE action for the Product module with the correct description', async () => {
     const middleware = auditLog('Inventory Module', 'UPDATE', (req) => `Updated product: ${req.params.id}`)
     const req = mockReq({ params: { id: 'prod-123' } })
     const res = mockRes()
@@ -71,9 +74,9 @@ describe('auditLog middleware', () => {
     expect(prisma.auditLog.create).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
-          entity_type: 'Inventory Module',
-          entity_id: 'prod-123',
+          module: 'Inventory Module',
           action: 'UPDATE',
+          description: 'Updated product: prod-123',
         }),
       })
     )
@@ -92,9 +95,9 @@ describe('auditLog middleware', () => {
     expect(prisma.auditLog.create).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
-          entity_type: 'Inventory Module',
-          entity_id: 'prod-999',
+          module: 'Inventory Module',
           action: 'DELETE',
+          description: 'Deleted product: prod-999',
         }),
       })
     )
@@ -113,15 +116,16 @@ describe('auditLog middleware', () => {
     expect(prisma.auditLog.create).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
-          entity_type: 'Stock Module',
+          module: 'Stock Module',
           action: 'CREATE',
-          performed_by: 'user-001',
+          user_id: 'user-001',
+          description: 'Stock In: 50 units',
         }),
       })
     )
   })
 
-  it('does not log when there is no authenticated user', async () => {
+  it('logs with null user_id and user_role when there is no authenticated user', async () => {
     const middleware = auditLog('Order Module', 'CREATE')
     const req = mockReq({ user: undefined })
     const res = mockRes()
@@ -131,7 +135,14 @@ describe('auditLog middleware', () => {
     res.json({ id: 'order-002' })
     await flushPromises()
 
-    expect(prisma.auditLog.create).not.toHaveBeenCalled()
+    expect(prisma.auditLog.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          user_id: null,
+          user_role: null,
+        }),
+      })
+    )
   })
 
   it('still calls next() and returns the response even if audit logging fails', async () => {
@@ -150,9 +161,9 @@ describe('auditLog middleware', () => {
     expect(result).toBe(res)
   })
 
-  it('falls back to body.id as entity_id when no params.id is present', async () => {
+  it('uses a default description when none is provided', async () => {
     const middleware = auditLog('Order Module', 'CREATE')
-    const req = mockReq({ params: {} })
+    const req = mockReq()
     const res = mockRes()
     const next = jest.fn()
 
@@ -163,13 +174,13 @@ describe('auditLog middleware', () => {
     expect(prisma.auditLog.create).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
-          entity_id: 'order-fallback-001',
+          description: 'CREATE on Order Module',
         }),
       })
     )
   })
 
-  it('does not set new_value when response status indicates failure', async () => {
+  it('sets status to "Failed" when response status indicates failure', async () => {
     const middleware = auditLog('Order Module', 'CREATE')
     const req = mockReq()
     const res = mockRes()
@@ -183,7 +194,7 @@ describe('auditLog middleware', () => {
     expect(prisma.auditLog.create).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
-          new_value: undefined,
+          status: 'Failed',
         }),
       })
     )

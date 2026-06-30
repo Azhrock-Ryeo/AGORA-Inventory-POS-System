@@ -19,15 +19,17 @@ export const requirePermission = (permission: string) => {
   return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const user = (req as any).user
-      if (!user) {
+      if (!user?.roleId) {
         res.status(401).json({ success: false, message: 'Unauthorized' })
         return
       }
-      const cacheKey = `perms:${user.role}`
+
+      const cacheKey = `perms:${user.roleId}`
       let permissions = await getCache<string[]>(cacheKey)
+
       if (!permissions) {
         const rolePermissions = await prisma.rolePermission.findMany({
-          where: { role_id: user.role },
+          where: { role_id: user.roleId },
           include: { permission: true },
         })
         permissions = rolePermissions.map(
@@ -35,10 +37,12 @@ export const requirePermission = (permission: string) => {
         )
         await setCache(cacheKey, permissions, 300)
       }
+
       if (!(permissions as string[]).includes(permission)) {
         res.status(403).json({ success: false, message: 'Forbidden: insufficient permissions' })
         return
       }
+
       next()
     } catch (err) {
       next(err)

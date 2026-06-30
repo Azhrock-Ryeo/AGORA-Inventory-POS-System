@@ -57,38 +57,44 @@ enum AuditAction {
 // ─── MODELS ──────────────────────────────────────────
 
 model User {
-  id            String   @id @default(uuid())
+  id            String  @id @default(uuid())
   name          String
-  email         String   @unique
+  email         String  @unique
   password_hash String
-  role_id       String
-  is_active     Boolean  @default(true)
-  created_at    DateTime @default(now())
-  updated_at    DateTime @updatedAt
+  is_active     Boolean @default(true)
 
-  role            Role            @relation(fields: [role_id], references: [id])
+  user_role       UserRole?
   orders          Order[]
   stock_movements StockMovement[]
 
-  @@index([role_id])
+  updated_at DateTime @updatedAt
+  created_at DateTime @default(now())
 }
 
 model Role {
-  id          String   @id @default(uuid())
-  role_name   String   @unique // SUPER_ADMIN, ADMIN, MANAGER, CASHIER
-  created_at  DateTime @default(now())
-  updated_at  DateTime @updatedAt
+  id        String @id @default(uuid())
+  role_name String @unique // SUPER_ADMIN, ADMIN, MANAGER, CASHIER
 
-  users       User[]
+  users       UserRole[]
   permissions RolePermission[]
 }
 
 model Permission {
-  id              String   @id @default(uuid())
-  permission_name String   @unique // e.g. "product:create", "order:refund"
-  created_at      DateTime @default(now())
+  id              String @id @default(uuid())
+  permission_name String @unique // e.g. "product:create", "order:refund"
 
   roles RolePermission[]
+}
+
+model UserRole {
+  id      String @id @default(uuid())
+  user_id String @unique
+  role_id String
+
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  role Role @relation(fields: [role_id], references: [id])
+
+  @@index([role_id])
 }
 
 model RolePermission {
@@ -105,69 +111,74 @@ model RolePermission {
 }
 
 model Category {
-  id          String    @id @default(uuid())
-  name        String    @unique
+  id          String  @id @default(uuid())
+  name        String  @unique
   description String?
-  created_at  DateTime  @default(now())
-  updated_at  DateTime  @updatedAt
 
   products Product[]
+
+  updated_at DateTime @updatedAt
+  created_at DateTime @default(now())
 }
 
 model Supplier {
-  id           String    @id @default(uuid())
+  id           String  @id @default(uuid())
   name         String
   contact_name String?
   email        String?
   phone        String?
   address      String?
-  created_at   DateTime  @default(now())
-  updated_at   DateTime  @updatedAt
 
   products Product[]
+
+  updated_at DateTime @updatedAt
+  created_at DateTime @default(now())
 }
 
 model Product {
   id          String        @id @default(uuid())
+  category_id String
+  supplier_id String?
   name        String
   sku         String        @unique
   barcode     String?       @unique
   price       Decimal       @db.Decimal(10, 2)
   status      ProductStatus @default(ACTIVE)
-  category_id String
-  supplier_id String?
-  created_at  DateTime      @default(now())
-  updated_at  DateTime      @updatedAt
 
   category        Category        @relation(fields: [category_id], references: [id])
-  supplier        Supplier?       @relation(fields: [supplier_id], references: [id])
+  supplier        Supplier?       @relation(fields: [supplier_id], references: [id], onDelete: SetNull)
   stock_level     StockLevel?
   order_items     OrderItem[]
   stock_movements StockMovement[]
+
+  updated_at DateTime @updatedAt
+  created_at DateTime @default(now())
 }
 
 model StockLevel {
-  id                   String   @id @default(uuid())
-  product_id           String   @unique
-  quantity             Int      @default(0)
-  low_stock_threshold  Int      @default(10)
-  high_stock_threshold Int      @default(100)
-  updated_at           DateTime @updatedAt
+  id                   String @id @default(uuid())
+  product_id           String @unique
+  quantity             Int    @default(0)
+  low_stock_threshold  Int    @default(10)
+  high_stock_threshold Int    @default(100)
 
-  product Product @relation(fields: [product_id], references: [id])
+  product Product @relation(fields: [product_id], references: [id], onDelete: Cascade)
+
+  updated_at DateTime @updatedAt
 }
 
 model StockMovement {
   id         String       @id @default(uuid())
   product_id String
+  user_id    String
   type       MovementType
   quantity   Int
   reason     String?
-  user_id    String
-  created_at DateTime     @default(now())
 
   product Product @relation(fields: [product_id], references: [id])
   user    User    @relation(fields: [user_id], references: [id])
+
+  created_at DateTime @default(now())
 
   @@index([product_id])
   @@index([user_id])
@@ -180,11 +191,12 @@ model Order {
   total      Decimal     @db.Decimal(10, 2)
   discount   Decimal     @default(0) @db.Decimal(10, 2)
   status     OrderStatus @default(PENDING)
-  created_at DateTime    @default(now())
 
   cashier     User         @relation(fields: [cashier_id], references: [id])
   items       OrderItem[]
   transaction Transaction?
+
+  created_at DateTime @default(now())
 
   @@index([cashier_id])
   @@index([status])
@@ -198,7 +210,7 @@ model OrderItem {
   quantity   Int
   unit_price Decimal @db.Decimal(10, 2)
 
-  order   Order   @relation(fields: [order_id], references: [id])
+  order   Order   @relation(fields: [order_id], references: [id], onDelete: Cascade)
   product Product @relation(fields: [product_id], references: [id])
 
   @@index([order_id])
@@ -212,15 +224,13 @@ model Transaction {
   payment_method PaymentMethod
   change         Decimal           @db.Decimal(10, 2)
   status         TransactionStatus @default(COMPLETED)
-  created_at     DateTime          @default(now())
 
-  order Order @relation(fields: [order_id], references: [id])
+  order Order @relation(fields: [order_id], references: [id], onDelete: Cascade)
+
+  created_at DateTime @default(now())
 }
 
 // ─── AUDIT TRAIL ─────────────────────────────────────
-// Generic log covering StockMovement, Product, and Order mutations.
-// entity_type holds the model name ("Product" | "StockMovement" | "Order"),
-// entity_id holds that record's id.
 
 model AuditLog {
   id          String      @id @default(uuid())
@@ -234,7 +244,8 @@ model AuditLog {
   new_value   String?
   ip_address  String?
   status      String      @default("Success")
-  created_at  DateTime    @default(now())
+
+  created_at DateTime @default(now())
 
   @@index([user_id])
   @@index([module])
@@ -254,7 +265,8 @@ model BillingReport {
   total_tax          Decimal  @default(0) @db.Decimal(10, 2)
   total_transactions Int      @default(0)
   generated_by       String?
-  created_at         DateTime @default(now())
+
+  created_at DateTime @default(now())
 
   @@unique([report_date])
   @@index([report_date])

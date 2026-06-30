@@ -6,17 +6,16 @@ export async function getUsers(req: Request, res: Response) {
   try {
     const caller = (req as any).user
 
-    // Build visibility filter based on role
     const roleFilter: any =
-        caller.role === 'SUPER_ADMIN'
-        ? { role: { role_name: { not: 'SUPER_ADMIN' } } } // SA sees all except other SAs
+      caller.role === 'SUPER_ADMIN'
+        ? { user_role: { role: { role_name: { not: 'SUPER_ADMIN' } } } }
         : caller.role === 'ADMIN'
-        ? { role: { role_name: { in: ['MANAGER', 'CASHIER'] } } }
+        ? { user_role: { role: { role_name: { in: ['MANAGER', 'CASHIER'] } } } }
         : { id: caller.userId }
 
     const users = await prisma.user.findMany({
       where: roleFilter,
-      include: { role: true },
+      include: { user_role: { include: { role: true } } },
       orderBy: { created_at: 'desc' },
     })
     res.json(users)
@@ -35,14 +34,18 @@ export async function createUser(req: Request, res: Response) {
     const existing = await prisma.user.findUnique({ where: { email } })
     if (existing) return res.status(409).json({ message: 'Email already in use' })
 
-    // ✅ Look up the role record by role_name
     const roleRecord = await prisma.role.findFirst({ where: { role_name: role } })
     if (!roleRecord) return res.status(400).json({ message: `Role '${role}' not found` })
 
     const password_hash = await bcrypt.hash(password, 12)
     const user = await prisma.user.create({
-      data: { name, email, password_hash, role_id: roleRecord.id },
-      include: { role: true },
+      data: {
+        name,
+        email,
+        password_hash,
+        user_role: { create: { role_id: roleRecord.id } },
+      },
+      include: { user_role: { include: { role: true } } },
     })
     res.status(201).json(user)
   } catch (err: any) {
@@ -60,16 +63,31 @@ export async function updateUser(req: Request, res: Response) {
     const data: any = {}
     if (name) data.name = name
     if (email) data.email = email
-    if (role) {
-  const roleRecord = await prisma.role.findFirst({ where: { role_name: role } })
-  if (roleRecord) data.role_id = roleRecord.id
-}
     if (password) data.password_hash = await bcrypt.hash(password, 12)
+
+    if (role) {
+      const roleRecord = await prisma.role.findFirst({ where: { role_name: role } })
+      if (roleRecord) {
+        data.user_role = {
+          upsert: {
+            update: { role_id: roleRecord.id },
+            create: { role_id: roleRecord.id },
+          },
+        }
+      }
+    }
 
     const user = await prisma.user.update({
       where: { id },
       data,
-      select: { id: true, name: true, email: true, role: true, is_active: true, created_at: true },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        is_active: true,
+        created_at: true,
+        user_role: { include: { role: true } },
+      },
     })
     res.json(user)
   } catch {
@@ -83,20 +101,20 @@ export async function deleteUser(req: Request, res: Response) {
     if (!id) return res.status(400).json({ message: 'User id is required' })
     const caller = (req as any).user
 
-    // Only Super Admin can delete
     if (caller.role !== 'SUPER_ADMIN') {
       return res.status(403).json({ message: 'Only Super Admin can delete accounts' })
     }
-    // Cannot delete yourself
     if (caller.userId === id) {
       return res.status(400).json({ message: 'You cannot delete your own account' })
     }
-    // Cannot delete another Super Admin
-    const target = await prisma.user.findUnique({ where: { id }, select: { id: true, role_id: true } })
+
+    const target = await prisma.user.findUnique({
+      where: { id },
+      include: { user_role: { include: { role: true } } },
+    })
     if (!target) return res.status(404).json({ message: 'User not found' })
 
-    const targetRole = await prisma.role.findUnique({ where: { id: target.role_id } })
-    if (targetRole?.role_name === 'SUPER_ADMIN') {
+    if (target.user_role?.role.role_name === 'SUPER_ADMIN') {
       return res.status(403).json({ message: 'Cannot delete a Super Admin account' })
     }
 
@@ -123,7 +141,14 @@ export async function toggleUserStatus(req: Request, res: Response) {
     const user = await prisma.user.update({
       where: { id },
       data: { is_active: !current.is_active },
-      select: { id: true, name: true, email: true, role: true, is_active: true, created_at: true },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        is_active: true,
+        created_at: true,
+        user_role: { include: { role: true } },
+      },
     })
     res.json(user)
   } catch {
