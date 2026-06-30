@@ -3,7 +3,7 @@ import prisma from '../utils/prisma'
 
 export function auditLog(
   module: string,
-  action: 'CREATE' | 'UPDATE' | 'DELETE',
+  action: 'CREATE' | 'UPDATE' | 'DELETE' | 'LOGIN' | 'LOGOUT' | 'EXPORT' | 'VOID' | 'ADJUST' | 'FAILED',
   getDescription?: (req: Request) => string
 ) {
   return async (req: Request, res: Response, next: NextFunction) => {
@@ -11,21 +11,18 @@ export function auditLog(
 
     res.json = function (body: any) {
       const user = (req as any).user
+      const status = res.statusCode < 400 ? 'Success' : 'Failed'
 
       const logEntry = async () => {
-        if (!user?.userId) return // skip logging if no authenticated user
-
-        const entityId =
-          req.params.id ?? body?.id ?? 'unknown'
-
         await prisma.auditLog.create({
           data: {
-            entity_type: module,
-            entity_id: String(entityId),
+            user_id: user?.userId ?? null,
+            user_role: user?.role ?? null,
+            module,
             action,
-            performed_by: user.userId,
-            old_value: undefined,
-            new_value: res.statusCode < 400 ? body : undefined,
+            description: getDescription ? getDescription(req) : `${action} on ${module}`,
+            ip_address: req.ip ?? null,
+            status,
           },
         }).catch((err) => console.error('[Audit] Failed to log:', err))
       }
