@@ -8,15 +8,18 @@ interface User {
   id: string
   name: string
   email: string
-  role: Role | { role_name: Role }
+  user_role: {
+    role: {
+      role_name: Role
+    }
+  }
   is_active: boolean
   created_at: string
 }
 
 // helper to safely get role string
 const getRole = (u: User): Role => {
-  if (typeof u.role === 'object' && u.role !== null) return (u.role as any).role_name
-  return u.role as Role
+  return u.user_role?.role?.role_name
 }
 
 interface FormState {
@@ -101,9 +104,9 @@ const handleDelete = async (u: User) => {
     setModalOpen(true)
   }
 
-  const openEdit = (u: User) => {
-    // Only SUPER_ADMIN can edit another SUPER_ADMIN
-    if (u.role === 'SUPER_ADMIN' && me?.role !== 'SUPER_ADMIN') return
+const openEdit = (u: User) => {
+  // Only SUPER_ADMIN can edit another SUPER_ADMIN
+  if (getRole(u) === 'SUPER_ADMIN' && me?.role !== 'SUPER_ADMIN') return
     setEditing(u)
     setForm({ name: u.name, email: u.email, password: '', role: getRole(u) })
     setError('')
@@ -192,7 +195,7 @@ const handleDelete = async (u: User) => {
             </thead>
             <tbody>
               {users.map((u) => {
-                const rs = ROLE_STYLE[getRole(u)]
+                const rs = ROLE_STYLE[getRole(u)] ?? { bg: 'rgba(148,163,184,0.15)', color: '#94a3b8' }
                 const isMe = u.id === me?.id
                 const isSuperAdmin = getRole(u) === 'SUPER_ADMIN'
                 const canEdit = !isSuperAdmin || me?.role === 'SUPER_ADMIN'
