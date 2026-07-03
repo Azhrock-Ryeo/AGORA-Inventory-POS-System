@@ -25,6 +25,12 @@ describe('calculateDiscount', () => {
     it('returns the exact subtotal when discount equals subtotal', () => {
       expect(calculateDiscount(500, 'FLAT', 500)).toBe(500)
     })
+
+    it('throws INVALID_DISCOUNT_VALUE when flat value is negative', () => {
+      expect(() => calculateDiscount(1000, 'FLAT', -50)).toThrow(
+        'INVALID_DISCOUNT_VALUE'
+      )
+    })
   })
 
   describe('PERCENTAGE discount', () => {
@@ -44,9 +50,12 @@ describe('calculateDiscount', () => {
       expect(calculateDiscount(1000, 'PERCENTAGE', 12.5)).toBe(125)
     })
 
-    it('throws INVALID_DISCOUNT_PERCENTAGE when value is negative', () => {
+    // NOTE: negative values are caught by the shared `discount_value < 0`
+    // guard before the FLAT/PERCENTAGE branch, so this throws
+    // INVALID_DISCOUNT_VALUE, not INVALID_DISCOUNT_PERCENTAGE.
+    it('throws INVALID_DISCOUNT_VALUE when value is negative', () => {
       expect(() => calculateDiscount(1000, 'PERCENTAGE', -10)).toThrow(
-        'INVALID_DISCOUNT_PERCENTAGE'
+        'INVALID_DISCOUNT_VALUE'
       )
     })
 

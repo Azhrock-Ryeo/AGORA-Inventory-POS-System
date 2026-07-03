@@ -13,6 +13,7 @@ import orderRoutes from './routes/order.routes'
 import transactionRoutes from './routes/transaction.routes'
 import userRoutes from './routes/user.routes'
 import reportRoutes from './routes/report.routes'
+import auditLogRoutes from './routes/auditLog.routes'
 
 dotenv.config()
 
@@ -55,5 +56,6 @@ app.use('/api/orders', orderRoutes)
 app.use('/api/transactions', transactionRoutes)
 app.use('/api/users', userRoutes)
 app.use('/api/reports', reportRoutes)
+app.use('/api/audit-logs', auditLogRoutes)
 
 export default app
