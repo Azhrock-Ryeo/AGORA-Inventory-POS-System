@@ -19,10 +19,10 @@ export async function loginUser(email: string, password: string) {
     throw new Error(`Account locked. Try again in ${minutes} minute(s).`)
   }
 
-  const user = await prisma.user.findUnique({
+  const user = (await prisma.user.findUnique({
     where: { email },
     include: { user_role: { include: { role: true } } },
-  })
+  })) as any
 
   if (!user || !user.is_active) {
     throw new Error('Invalid credentials')
@@ -46,8 +46,9 @@ export async function loginUser(email: string, password: string) {
   await redis.del(attemptsKey)
   await redis.del(lockKey)
 
-  const roleId = user.user_role?.role_id
-  const roleName = user.user_role?.role.role_name
+  const userRole = user.user_role
+  const roleId = userRole?.role_id
+  const roleName = userRole?.role.role_name
 
   if (!roleId || !roleName) {
     throw new Error('User has no assigned role')
@@ -77,17 +78,18 @@ export async function refreshUserToken(oldRefreshToken: string) {
     throw new Error('Invalid or expired refresh token')
   }
 
-  const user = await prisma.user.findUnique({
+  const user = (await prisma.user.findUnique({
     where: { id: payload.userId },
     include: { user_role: { include: { role: true } } },
-  })
+  })) as any
 
   if (!user || !user.is_active) {
     throw new Error('User not found or inactive')
   }
 
-  const roleId = user.user_role?.role_id
-  const roleName = user.user_role?.role.role_name
+  const userRole = user.user_role
+  const roleId = userRole?.role_id
+  const roleName = userRole?.role.role_name
 
   if (!roleId || !roleName) {
     throw new Error('User has no assigned role')

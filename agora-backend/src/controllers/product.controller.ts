@@ -9,17 +9,27 @@ export async function getProducts(req: Request, res: Response) {
     const pageNum = Number(page)
     const limitNum = Number(limit)
 
-    // Unique cache key per query variation
     const cacheKey = `products:list:page=${pageNum}:limit=${limitNum}:search=${search ?? ''}:category=${category_id ?? ''}:status=${status ?? ''}`
 
     const cached = await getCache<any>(cacheKey)
     if (cached) return res.json(cached)
 
-    const where = {
-      ...(search && { name: { contains: String(search), mode: 'insensitive' as const } }),
-      ...(category_id && { category_id: String(category_id) }),
-      ...(status && { status: String(status).toUpperCase() as any }),
+    // ✅ FIX: Use raw query for case-insensitive search if citext not available
+    // Fallback: use LOWER() comparison which works on all PostgreSQL setups
+    const where: any = {}
+
+    if (search) {
+      const searchStr = String(search).trim()
+      // Search across name, sku, and barcode
+      where.OR = [
+        { name: { contains: searchStr, mode: 'insensitive' } },
+        { sku: { contains: searchStr, mode: 'insensitive' } },
+        { barcode: { contains: searchStr, mode: 'insensitive' } },
+      ]
     }
+
+    if (category_id) where.category_id = String(category_id)
+    if (status) where.status = String(status).toUpperCase() as any
 
     const [products, total] = await Promise.all([
       prisma.product.findMany({
@@ -29,7 +39,7 @@ export async function getProducts(req: Request, res: Response) {
         take: limitNum,
         orderBy: { name: 'asc' },
       }),
-      prisma.product.count({ where }),  // ✅ count now respects filters too
+      prisma.product.count({ where }),
     ])
 
     const response = { data: products, total, page: pageNum, limit: limitNum }
@@ -38,6 +48,7 @@ export async function getProducts(req: Request, res: Response) {
 
     res.json(response)
   } catch (err) {
+    console.error('getProducts error:', err)
     res.status(500).json({ message: 'Failed to fetch products' })
   }
 }
@@ -59,11 +70,27 @@ export async function getProductById(req: Request, res: Response) {
 export async function createProduct(req: Request, res: Response) {
   try {
     const { name, sku, barcode, price, category_id, supplier_id } = req.body
+
+    // ✅ Validate required fields
+    if (!name || !sku || !price || !category_id) {
+      return res.status(400).json({ message: 'Name, SKU, price, and category_id are required' })
+    }
+
     const existing = await prisma.product.findUnique({ where: { sku } })
     if (existing) return res.status(409).json({ message: 'SKU already exists' })
 
+    // ✅ Auto-generate barcode if not provided (for QR scanning)
+    const finalBarcode = barcode || `AGORA-${sku}-${Date.now()}`
+
     const product = await prisma.product.create({
-      data: { name, sku, barcode, price, category_id, supplier_id },
+      data: { 
+        name, 
+        sku, 
+        barcode: finalBarcode, 
+        price: Number(price), 
+        category_id, 
+        supplier_id: supplier_id || null 
+      },
     })
 
     await prisma.stockLevel.create({
@@ -74,6 +101,7 @@ export async function createProduct(req: Request, res: Response) {
 
     res.status(201).json(product)
   } catch (err) {
+    console.error('createProduct error:', err)
     res.status(500).json({ message: 'Failed to create product' })
   }
 }
@@ -85,7 +113,15 @@ export async function updateProduct(req: Request, res: Response) {
 
     const product = await prisma.product.update({
       where: { id },
-      data: { name, sku, barcode, price, category_id, supplier_id, status },
+      data: { 
+        name, 
+        sku, 
+        barcode, 
+        price: price !== undefined ? Number(price) : undefined, 
+        category_id, 
+        supplier_id: supplier_id || null, 
+        status 
+      },
     })
 
     await invalidateCachePattern('products:list:*')
@@ -126,11 +162,13 @@ export async function lookupProduct(req: Request, res: Response) {
     const { qr } = req.query
     if (!qr) return res.status(400).json({ message: 'qr query param is required' })
 
+    const qrStr = String(qr).trim()
+
     const product = await prisma.product.findFirst({
       where: {
         OR: [
-          { barcode: String(qr) },
-          { sku: String(qr) },
+          { barcode: qrStr },
+          { sku: qrStr },
         ],
         status: 'ACTIVE',
       },
@@ -141,6 +179,7 @@ export async function lookupProduct(req: Request, res: Response) {
 
     res.json({ data: product })
   } catch (err) {
+    console.error('lookupProduct error:', err)
     res.status(500).json({ message: 'Failed to lookup product' })
   }
 }

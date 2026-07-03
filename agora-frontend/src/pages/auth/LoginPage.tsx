@@ -12,7 +12,9 @@ export default function LoginPage() {
   const setAuth = useAuthStore((s) => s.setAuth)
   const navigate = useNavigate()
 
-  const handleLogin = async () => {
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault()
+
     if (!email || !password) {
       setError('Please enter your email and password.')
       return
@@ -29,8 +31,16 @@ export default function LoginPage() {
 
       setAuth(data.user, data.accessToken)
       navigate('/dashboard')
-    } catch {
-      setError('Invalid email or password.')
+    } catch (err: any) {
+      const status = err?.response?.status
+
+      if (status === 401 || status === 400) {
+        setError('Invalid email or password.')
+      } else if (!err?.response) {
+        setError('Unable to reach the server. Check your connection and try again.')
+      } else {
+        setError('Something went wrong. Please try again.')
+      }
     } finally {
       setLoading(false)
     }
@@ -48,7 +58,8 @@ export default function LoginPage() {
         padding: '20px',
       }}
     >
-      <div
+      <form
+        onSubmit={handleLogin}
         style={{
           width: '100%',
           maxWidth: '420px',
@@ -81,6 +92,7 @@ export default function LoginPage() {
 
         <div style={{ marginBottom: '18px' }}>
           <label
+            htmlFor="login-email"
             style={{
               display: 'block',
               marginBottom: '8px',
@@ -91,10 +103,13 @@ export default function LoginPage() {
           </label>
 
           <input
+            id="login-email"
             type="email"
             placeholder="Enter your email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
+            disabled={loading}
+            autoFocus
             style={{
               width: '100%',
               padding: '14px',
@@ -102,12 +117,14 @@ export default function LoginPage() {
               border: '1px solid #ccc',
               fontSize: '15px',
               boxSizing: 'border-box',
+              opacity: loading ? 0.7 : 1,
             }}
           />
         </div>
 
         <div style={{ marginBottom: '20px' }}>
           <label
+            htmlFor="login-password"
             style={{
               display: 'block',
               marginBottom: '8px',
@@ -118,11 +135,12 @@ export default function LoginPage() {
           </label>
 
           <input
+            id="login-password"
             type="password"
             placeholder="Enter your password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && handleLogin()}
+            disabled={loading}
             style={{
               width: '100%',
               padding: '14px',
@@ -130,12 +148,15 @@ export default function LoginPage() {
               border: '1px solid #ccc',
               fontSize: '15px',
               boxSizing: 'border-box',
+              opacity: loading ? 0.7 : 1,
             }}
           />
         </div>
 
         {error && (
           <div
+            role="alert"
+            aria-live="polite"
             style={{
               background: '#FEE2E2',
               color: '#B91C1C',
@@ -149,7 +170,7 @@ export default function LoginPage() {
         )}
 
         <button
-          onClick={handleLogin}
+          type="submit"
           disabled={loading}
           style={{
             width: '100%',
@@ -178,7 +199,7 @@ export default function LoginPage() {
         >
           AGORA Inventory Management System
         </div>
-      </div>
+      </form>
     </div>
   )
 }
