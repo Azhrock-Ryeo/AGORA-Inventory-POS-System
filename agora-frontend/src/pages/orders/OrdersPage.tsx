@@ -46,18 +46,19 @@ interface Order {
 type DiscountType = 'flat' | 'percentage'
 type ActiveTab = 'pos' | 'history'
 
-const BG_BASE = '#0f172a'
-const BG_CARD = '#1e293b'
-const BORDER = '#334155'
-const TEXT_PRIMARY = '#f1f5f9'
-const TEXT_SECONDARY = '#94a3b8'
-const TEXT_MUTED = '#475569'
+// ── unified charcoal / white / amber theme (matches Sidebar/Topbar/Dashboard/Login) ─
+const BG_BASE = '#18181b'
+const BG_CARD = '#1f1f23'
+const BORDER = 'rgba(255,255,255,0.08)'
+const TEXT_PRIMARY = '#f4f4f5'
+const TEXT_SECONDARY = '#a1a1aa'
+const TEXT_MUTED = '#71717a'
 const ACCENT = '#f59e0b'
-const ACCENT_DIM = 'rgba(245,158,11,0.12)'
+const ACCENT_DIM = 'rgba(245,158,11,0.14)'
 const SUCCESS = '#34d399'
-const SUCCESS_DIM = 'rgba(52,211,153,0.12)'
+const SUCCESS_DIM = 'rgba(52,211,153,0.14)'
 const DANGER = '#f87171'
-const DANGER_DIM = 'rgba(248,113,113,0.12)'
+const DANGER_DIM = 'rgba(248,113,113,0.14)'
 
 const peso = (v: number) =>
   `₱${Number(v).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
@@ -85,10 +86,11 @@ export default function OrdersPage() {
   const [search, setSearch] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
 
-useEffect(() => {
-  const timer = setTimeout(() => setDebouncedSearch(search), 300)
-  return () => clearTimeout(timer)
-}, [search])
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(search), 300)
+    return () => clearTimeout(timer)
+  }, [search])
+
   const [cart, setCart] = useState<CartItem[]>([])
   const [discountType, setDiscountType] = useState<DiscountType>('flat')
   const [discountValue, setDiscountValue] = useState<number>(0)
@@ -101,16 +103,22 @@ useEffect(() => {
   const [showOrderDetail, setShowOrderDetail] = useState(false)
   const [showScanner, setShowScanner] = useState(false)
   const [scanError, setScanError] = useState('')
+  // ── NEW: visible checkout failure state (this was the actual bug — mutation had no onError) ──
+  const [checkoutError, setCheckoutError] = useState('')
 
   const { data: products = [], isFetching: isSearching } = useQuery<Product[]>({
-  queryKey: ['products', debouncedSearch],
-  queryFn: async () => {
-    const res = await api.get('/products', { params: { search: debouncedSearch, status: 'ACTIVE' } })
-    return res.data?.data ?? res.data ?? []
-  },
-})
+    queryKey: ['products', debouncedSearch],
+    queryFn: async () => {
+      const res = await api.get('/products', { params: { search: debouncedSearch, status: 'ACTIVE' } })
+      return res.data?.data ?? res.data ?? []
+    },
+  })
 
-  const { data: orders = [] } = useQuery<Order[]>({
+  const {
+    data: orders = [],
+    isLoading: ordersLoading,
+    isError: ordersError,
+  } = useQuery<Order[]>({
     queryKey: ['orders', historySearch],
     queryFn: async () => {
       const res = await api.get('/orders', { params: { search: historySearch } })
@@ -125,12 +133,24 @@ useEffect(() => {
       return res.data as Order
     },
     onSuccess: (data) => {
+      setCheckoutError('')
       setCompletedOrder(data)
       setShowPayment(false)
       setShowReceipt(true)
       queryClient.invalidateQueries({ queryKey: ['orders'] })
       queryClient.invalidateQueries({ queryKey: ['stock'] })
       queryClient.invalidateQueries({ queryKey: ['transactions'] })
+    },
+    // ── FIX: this was completely missing before. A failed checkout (network error,
+    // stock conflict, server 500, etc.) previously produced NO feedback at all —
+    // the cashier just saw the button re-enable with no explanation. ──
+    onError: (err: any) => {
+      const msg =
+        err?.response?.data?.message ||
+        (err?.response?.status
+          ? `Checkout failed (error ${err.response.status}). Please try again.`
+          : 'Unable to reach the server. Check your connection and try again.')
+      setCheckoutError(msg)
     },
   })
 
@@ -178,12 +198,14 @@ useEffect(() => {
   const handleCheckout = () => {
     if (cart.length === 0) return
     setAmountPaid(0)
+    setCheckoutError('')
     setShowPayment(true)
   }
 
   // ✅ FIX: Only send discount if value > 0, send amount_paid properly
   const handleConfirmPayment = () => {
     if (amountPaid < total) return
+    setCheckoutError('')
     createOrder.mutate({
       items: cart.map((i) => ({
         product_id: i.product.id,
@@ -204,28 +226,29 @@ useEffect(() => {
     setShowReceipt(false)
     setCompletedOrder(null)
     setAmountPaid(0)
+    setCheckoutError('')
   }
 
   // ✅ NEW: Download receipt PDF using fetch (more reliable than axios for blobs)
   const downloadReceiptPDF = async (orderId: string) => {
-  try {
-    const response = await api.get(`/orders/${orderId}/receipt/pdf`, {
-      responseType: 'blob',
-    })
-    const url = window.URL.createObjectURL(new Blob([response.data]))
-    const link = document.createElement('a')
-    link.href = url
-    link.setAttribute('download', `receipt-${orderId.slice(-8)}.pdf`)
-    document.body.appendChild(link)
-    link.click()
-    link.remove()
-    window.URL.revokeObjectURL(url)
-  } catch (err: any) {
-    console.error('Failed to download PDF:', err)
-    setScanError(err.response?.data?.message || 'Failed to download PDF receipt')
-    setTimeout(() => setScanError(''), 4000)
+    try {
+      const response = await api.get(`/orders/${orderId}/receipt/pdf`, {
+        responseType: 'blob',
+      })
+      const url = window.URL.createObjectURL(new Blob([response.data]))
+      const link = document.createElement('a')
+      link.href = url
+      link.setAttribute('download', `receipt-${orderId.slice(-8)}.pdf`)
+      document.body.appendChild(link)
+      link.click()
+      link.remove()
+      window.URL.revokeObjectURL(url)
+    } catch (err: any) {
+      console.error('Failed to download PDF:', err)
+      setScanError(err.response?.data?.message || 'Failed to download PDF receipt')
+      setTimeout(() => setScanError(''), 4000)
+    }
   }
-}
 
   // ✅ NEW: Get proper discount label for receipt
   const getDiscountLabel = () => {
@@ -254,7 +277,7 @@ useEffect(() => {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 0, height: '100%', minHeight: 0 }}>
 
-      {/* Error Toast */}
+      {/* Error Toast (scan/stock/PDF errors) */}
       {scanError && (
         <div style={{
           position: 'fixed', top: 20, right: 20, zIndex: 100,
@@ -281,7 +304,7 @@ useEffect(() => {
                 padding: '8px 20px', borderRadius: 8, fontSize: 13, fontWeight: 600,
                 border: 'none', cursor: 'pointer',
                 background: activeTab === tab ? ACCENT : BG_CARD,
-                color: activeTab === tab ? '#fff' : TEXT_SECONDARY,
+                color: activeTab === tab ? '#18181b' : TEXT_SECONDARY,
                 transition: 'all 0.15s',
               }}
             >
@@ -359,17 +382,17 @@ useEffect(() => {
                 )
               })}
               {isSearching && (
-  <div style={{ gridColumn: '1/-1', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '60px 0', color: TEXT_MUTED }}>
-    <span style={{ fontSize: 36, marginBottom: 10 }}>⏳</span>
-    <p style={{ fontSize: 13 }}>Searching…</p>
-  </div>
-)}
-{!isSearching && products.length === 0 && (
-  <div style={{ gridColumn: '1/-1', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '60px 0', color: TEXT_MUTED }}>
-    <span style={{ fontSize: 36, marginBottom: 10 }}>📦</span>
-    <p style={{ fontSize: 13 }}>No products found</p>
-  </div>
-)}
+                <div style={{ gridColumn: '1/-1', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '60px 0', color: TEXT_MUTED }}>
+                  <span style={{ fontSize: 36, marginBottom: 10 }}>⏳</span>
+                  <p style={{ fontSize: 13 }}>Searching…</p>
+                </div>
+              )}
+              {!isSearching && products.length === 0 && (
+                <div style={{ gridColumn: '1/-1', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '60px 0', color: TEXT_MUTED }}>
+                  <span style={{ fontSize: 36, marginBottom: 10 }}>📦</span>
+                  <p style={{ fontSize: 13 }}>No products found</p>
+                </div>
+              )}
             </div>
           </div>
 
@@ -458,7 +481,7 @@ useEffect(() => {
                 disabled={cart.length === 0}
                 style={{
                   background: cart.length === 0 ? BORDER : ACCENT,
-                  color: cart.length === 0 ? TEXT_MUTED : '#fff',
+                  color: cart.length === 0 ? TEXT_MUTED : '#18181b',
                   border: 'none', borderRadius: 8, padding: '12px',
                   fontSize: 13, fontWeight: 700,
                   cursor: cart.length === 0 ? 'not-allowed' : 'pointer',
@@ -484,39 +507,58 @@ useEffect(() => {
               style={{ background: BG_CARD, border: `1px solid ${BORDER}`, borderRadius: 8, padding: '10px 14px', color: TEXT_PRIMARY, fontSize: 13, outline: 'none', width: 280 }}
             />
           </div>
-          <div style={card({ overflow: 'hidden', padding: 0 })}>
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-              <thead>
-                <tr style={{ background: BG_BASE }}>
-                  {['Order ID', 'Date', 'Cashier', 'Total', 'Status', ''].map((h) => (
-                    <th key={h} style={{ padding: '12px 20px', textAlign: 'left', fontSize: 11, fontWeight: 700, color: TEXT_MUTED, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {orders.map((order) => {
-                  const sc = statusColors(order.status)
-                  return (
-                    <tr key={order.id} style={{ borderTop: `1px solid ${BORDER}` }}>
-                      <td style={{ padding: '14px 20px', fontFamily: 'monospace', fontSize: 12, color: TEXT_SECONDARY }}>#{order.id.slice(-8).toUpperCase()}</td>
-                      <td style={{ padding: '14px 20px', color: TEXT_SECONDARY, fontSize: 13 }}>{new Date(order.created_at).toLocaleString('en-PH')}</td>
-                      <td style={{ padding: '14px 20px', color: TEXT_SECONDARY, fontSize: 13 }}>{order.cashier?.name ?? '—'}</td>
-                      <td style={{ padding: '14px 20px', color: ACCENT, fontSize: 13, fontWeight: 700 }}>{peso(order.total)}</td>
-                      <td style={{ padding: '14px 20px' }}>
-                        <span style={{ fontSize: 10, fontWeight: 700, padding: '3px 10px', borderRadius: 20, background: sc.bg, color: sc.color }}>{order.status}</span>
-                      </td>
-                      <td style={{ padding: '14px 20px' }}>
-                        <button onClick={() => { setSelectedOrder(order); setShowOrderDetail(true) }} style={{ background: 'none', border: 'none', color: ACCENT, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>View →</button>
-                      </td>
-                    </tr>
-                  )
-                })}
-                {orders.length === 0 && (
-                  <tr><td colSpan={6} style={{ padding: '48px', textAlign: 'center', color: TEXT_MUTED, fontSize: 13 }}>No orders found</td></tr>
-                )}
-              </tbody>
-            </table>
-          </div>
+
+          {/* NEW: loading state for order history */}
+          {ordersLoading && (
+            <div style={card({ padding: 48, textAlign: 'center', color: TEXT_MUTED })}>
+              <div style={{ width: 28, height: 28, borderRadius: '50%', border: `3px solid ${ACCENT}`, borderTopColor: 'transparent', animation: 'spin 0.7s linear infinite', margin: '0 auto 12px' }} />
+              <p style={{ fontSize: 13, margin: 0 }}>Loading orders…</p>
+              <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
+            </div>
+          )}
+
+          {/* NEW: error state if order list fails to fetch */}
+          {!ordersLoading && ordersError && (
+            <div style={{ ...card({ padding: 32, textAlign: 'center' }), background: DANGER_DIM, border: `1px solid ${DANGER}` }}>
+              <p style={{ color: DANGER, fontSize: 13, margin: 0 }}>Failed to load order history. Please try again.</p>
+            </div>
+          )}
+
+          {!ordersLoading && !ordersError && (
+            <div style={card({ overflow: 'hidden', padding: 0 })}>
+              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <thead>
+                  <tr style={{ background: BG_BASE }}>
+                    {['Order ID', 'Date', 'Cashier', 'Total', 'Status', ''].map((h) => (
+                      <th key={h} style={{ padding: '12px 20px', textAlign: 'left', fontSize: 11, fontWeight: 700, color: TEXT_MUTED, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {orders.map((order) => {
+                    const sc = statusColors(order.status)
+                    return (
+                      <tr key={order.id} style={{ borderTop: `1px solid ${BORDER}` }}>
+                        <td style={{ padding: '14px 20px', fontFamily: 'monospace', fontSize: 12, color: TEXT_SECONDARY }}>#{order.id.slice(-8).toUpperCase()}</td>
+                        <td style={{ padding: '14px 20px', color: TEXT_SECONDARY, fontSize: 13 }}>{new Date(order.created_at).toLocaleString('en-PH')}</td>
+                        <td style={{ padding: '14px 20px', color: TEXT_SECONDARY, fontSize: 13 }}>{order.cashier?.name ?? '—'}</td>
+                        <td style={{ padding: '14px 20px', color: ACCENT, fontSize: 13, fontWeight: 700 }}>{peso(order.total)}</td>
+                        <td style={{ padding: '14px 20px' }}>
+                          <span style={{ fontSize: 10, fontWeight: 700, padding: '3px 10px', borderRadius: 20, background: sc.bg, color: sc.color }}>{order.status}</span>
+                        </td>
+                        <td style={{ padding: '14px 20px' }}>
+                          <button onClick={() => { setSelectedOrder(order); setShowOrderDetail(true) }} style={{ background: 'none', border: 'none', color: ACCENT, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>View →</button>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                  {orders.length === 0 && (
+                    <tr><td colSpan={6} style={{ padding: '48px', textAlign: 'center', color: TEXT_MUTED, fontSize: 13 }}>No orders found</td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       )}
 
@@ -525,6 +567,14 @@ useEffect(() => {
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 50, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
           <div style={card({ padding: 28, width: '100%', maxWidth: 380 })}>
             <h2 style={{ color: TEXT_PRIMARY, fontSize: 18, fontWeight: 700, margin: '0 0 20px' }}>Payment</h2>
+
+            {/* NEW: visible checkout failure banner — this is the fix for the actual bug */}
+            {checkoutError && (
+              <div style={{ background: DANGER_DIM, border: `1px solid ${DANGER}`, borderRadius: 8, padding: '12px 16px', marginBottom: 16 }}>
+                <p style={{ color: DANGER, fontSize: 13, margin: 0, fontWeight: 600 }}>{checkoutError}</p>
+              </div>
+            )}
+
             <div style={{ display: 'flex', flexDirection: 'column', gap: 14, marginBottom: 24 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: TEXT_SECONDARY }}>
                 <span>Total Amount</span>
@@ -555,8 +605,8 @@ useEffect(() => {
               )}
             </div>
             <div style={{ display: 'flex', gap: 10 }}>
-              <button onClick={() => setShowPayment(false)} style={{ flex: 1, background: 'none', border: `1px solid ${BORDER}`, borderRadius: 8, padding: '12px', color: TEXT_SECONDARY, fontSize: 13, cursor: 'pointer' }}>Cancel</button>
-              <button onClick={handleConfirmPayment} disabled={amountPaid < total || createOrder.isPending} style={{ flex: 1, background: amountPaid < total ? BORDER : ACCENT, border: 'none', borderRadius: 8, padding: '12px', color: '#fff', fontSize: 13, fontWeight: 700, cursor: amountPaid < total ? 'not-allowed' : 'pointer' }}>
+              <button onClick={() => { setShowPayment(false); setCheckoutError('') }} style={{ flex: 1, background: 'none', border: `1px solid ${BORDER}`, borderRadius: 8, padding: '12px', color: TEXT_SECONDARY, fontSize: 13, cursor: 'pointer' }}>Cancel</button>
+              <button onClick={handleConfirmPayment} disabled={amountPaid < total || createOrder.isPending} style={{ flex: 1, background: amountPaid < total ? BORDER : ACCENT, border: 'none', borderRadius: 8, padding: '12px', color: '#18181b', fontSize: 13, fontWeight: 700, cursor: amountPaid < total ? 'not-allowed' : 'pointer' }}>
                 {createOrder.isPending ? 'Processing…' : 'Confirm Payment'}
               </button>
             </div>
@@ -614,11 +664,10 @@ useEffect(() => {
               <div style={{ fontSize: 12, color: TEXT_MUTED }}>Thank you for shopping!</div>
               <div style={{ fontSize: 11, color: TEXT_MUTED, marginTop: 2 }}>Please come again 🙂</div>
             </div>
-            {/* ✅ FIX: Added PDF download button */}
             <div style={{ display: 'flex', gap: 10, marginTop: 20, paddingTop: 16, borderTop: `1px solid ${BORDER}` }}>
               <button onClick={() => window.print()} style={{ flex: 1, background: 'none', border: `1px solid ${BORDER}`, borderRadius: 8, padding: '12px', color: TEXT_SECONDARY, fontSize: 13, cursor: 'pointer' }}>Print</button>
               <button onClick={() => downloadReceiptPDF(completedOrder.id)} style={{ flex: 1, background: BG_BASE, border: `1px solid ${ACCENT}`, borderRadius: 8, padding: '12px', color: ACCENT, fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>Download PDF</button>
-              <button onClick={handleNewOrder} style={{ flex: 1, background: ACCENT, border: 'none', borderRadius: 8, padding: '12px', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>New Order</button>
+              <button onClick={handleNewOrder} style={{ flex: 1, background: ACCENT, border: 'none', borderRadius: 8, padding: '12px', color: '#18181b', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>New Order</button>
             </div>
           </div>
         </div>
@@ -679,18 +728,13 @@ useEffect(() => {
 
       {/* Camera Scanner */}
       {showScanner && (
-        // Cast props to any because CameraScanner's props type does not include onError here
-        <CameraScanner {...({
-          onProductFound: (product: Product) => {
+        <CameraScanner
+          onProductFound={(product: Product) => {
             addToCart(product)
             setShowScanner(false)
-          },
-          onError: (err: any) => {
-            setScanError(err)
-            setTimeout(() => setScanError(''), 3000)
-          },
-          onClose: () => setShowScanner(false),
-        } as any)} />
+          }}
+          onClose={() => setShowScanner(false)}
+        />
       )}
     </div>
   )

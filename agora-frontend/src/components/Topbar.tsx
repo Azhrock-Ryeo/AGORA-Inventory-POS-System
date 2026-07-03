@@ -31,8 +31,8 @@ export function Topbar() {
       style={{
         height: '56px',
         minHeight: '56px',
-        background: '#0f172a',
-        borderBottom: '1px solid #1e293b',
+        background: '#18181b',
+        borderBottom: '1px solid rgba(255,255,255,0.08)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
@@ -44,35 +44,44 @@ export function Topbar() {
       </h1>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-        <span
-          style={{
-            fontSize: '11px',
-            fontWeight: 600,
-            padding: '3px 10px',
-            borderRadius: '20px',
-            background: roleStyle.bg,
-            color: roleStyle.color,
-            letterSpacing: '0.3px',
-          }}
-        >
-          {user?.role?.replace('_', ' ')}
-        </span>
-        <div
-          style={{
-            width: '32px',
-            height: '32px',
-            borderRadius: '50%',
-            background: '#1e293b',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            color: '#94a3b8',
-            fontSize: '13px',
-            fontWeight: 700,
-          }}
-        >
-          {user?.name?.[0]?.toUpperCase() ?? '?'}
-        </div>
+        {user ? (
+          <>
+            <span
+              style={{
+                fontSize: '11px',
+                fontWeight: 600,
+                padding: '3px 10px',
+                borderRadius: '20px',
+                background: roleStyle.bg,
+                color: roleStyle.color,
+                letterSpacing: '0.3px',
+              }}
+            >
+              {user.role?.replace('_', ' ')}
+            </span>
+            <div
+              style={{
+                width: '32px',
+                height: '32px',
+                borderRadius: '50%',
+                background: '#27272a',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#94a3b8',
+                fontSize: '13px',
+                fontWeight: 700,
+              }}
+            >
+              {user.name?.[0]?.toUpperCase() ?? '?'}
+            </div>
+          </>
+        ) : (
+          // session expired / no user — visible signal instead of silent "?"
+          <span style={{ fontSize: '12px', color: '#f87171', fontWeight: 600 }}>
+            Session expired
+          </span>
+        )}
       </div>
     </div>
   )
