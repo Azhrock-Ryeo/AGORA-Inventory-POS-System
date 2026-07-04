@@ -9,4 +9,6 @@ export const createOrderSchema = z.object({
   ).min(1, 'At least one item is required'),
   discount_type: z.enum(['FLAT', 'PERCENTAGE']).optional(),
   discount_value: z.number().nonnegative().optional(),
+  amount_paid: z.number().nonnegative().optional(),
+  payment_method: z.enum(['CASH', 'CARD', 'GCASH', 'MAYA']).optional(),
 })

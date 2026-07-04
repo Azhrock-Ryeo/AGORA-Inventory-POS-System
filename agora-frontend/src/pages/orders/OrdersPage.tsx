@@ -237,7 +237,7 @@ export default function OrdersPage() {
       discount_type: discountValue > 0 ? discountType.toUpperCase() : undefined,
       discount_value: discountValue > 0 ? discountValue : undefined,
       amount_paid: amountPaid,
-      payment_method: 'cash',
+      payment_method: 'CASH',
     })
   }
 
