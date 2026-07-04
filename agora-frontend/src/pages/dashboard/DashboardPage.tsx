@@ -26,21 +26,43 @@ interface StockLevel {
   product: { id: string; name: string; sku: string }
 }
 
+// ── unified charcoal / white / amber theme (matches Sidebar/Topbar) ──────────
+const colors = {
+  ink: '#18181b',
+  cardBg: '#1f1f23',
+  cardBorder: 'rgba(255,255,255,0.08)',
+  divider: 'rgba(255,255,255,0.06)',
+  paper: '#f4f4f5',
+  sand: '#d4d4d8',
+  sandMuted: '#71717a',
+  marigold: '#f59e0b',
+  marigoldBg: 'rgba(245,158,11,0.14)',
+  jade: '#34d399',
+  jadeBg: 'rgba(52,211,153,0.14)',
+  brick: '#ef4444',
+  brickBg: 'rgba(239,68,68,0.12)',
+}
+
+const fontDisplay = "'Fraunces', serif"
+const fontBody = "'Inter', sans-serif"
+const fontMono = "'IBM Plex Mono', monospace"
+
 // ── small helpers ────────────────────────────────────────────────────────────
 const card = (extra?: React.CSSProperties): React.CSSProperties => ({
-  background: '#1e293b',
-  border: '1px solid #334155',
-  borderRadius: '12px',
+  background: colors.cardBg,
+  border: `0.5px solid ${colors.cardBorder}`,
+  borderRadius: '10px',
   padding: '20px',
   ...extra,
 })
 
 const label: React.CSSProperties = {
+  fontFamily: fontBody,
   fontSize: '11px',
-  fontWeight: 700,
-  letterSpacing: '0.08em',
+  fontWeight: 600,
+  letterSpacing: '0.06em',
   textTransform: 'uppercase',
-  color: '#64748b',
+  color: colors.sandMuted,
   marginBottom: '6px',
 }
 
@@ -48,10 +70,10 @@ const label: React.CSSProperties = {
 function CustomTooltip({ active, payload, label: lbl }: any) {
   if (!active || !payload?.length) return null
   return (
-    <div style={{ background: '#0f172a', border: '1px solid #334155', borderRadius: 8, padding: '10px 14px' }}>
-      <p style={{ color: '#94a3b8', fontSize: 12, marginBottom: 6 }}>{lbl}</p>
+    <div style={{ background: colors.ink, border: `0.5px solid ${colors.cardBorder}`, borderRadius: 8, padding: '10px 14px' }}>
+      <p style={{ fontFamily: fontBody, color: colors.sandMuted, fontSize: 12, marginBottom: 6 }}>{lbl}</p>
       {payload.map((p: any) => (
-        <p key={p.name} style={{ color: p.color, fontSize: 13, fontWeight: 600 }}>
+        <p key={p.name} style={{ fontFamily: fontMono, color: colors.marigold, fontSize: 13, fontWeight: 500 }}>
           {p.name}: {peso(p.value)}
         </p>
       ))}
@@ -64,34 +86,31 @@ export default function DashboardPage() {
   const navigate = useNavigate()
 
   const [orders, setOrders] = useState<Order[]>([])
-  const [recentOrders, setRecentOrders] = useState<Order[]>([])// add this new state
+  const [recentOrders, setRecentOrders] = useState<Order[]>([])
   const [stockLevels, setStockLevels] = useState<StockLevel[]>([])
   const [totalProducts, setTotalProducts] = useState(0)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
-   
-
   useEffect(() => {
     async function load() {
       try {
-
         const [todayOrdersRes, recentRes, stockRes, productsRes] = await Promise.all([
-          api.get(`/orders?status=COMPLETED&limit=200`), // for stats + chart
-          api.get('/orders?limit=6'),                                   // for recent panel
-          api.get('/stock/levels?limit=50'),                            // paginated
-          api.get('/products?limit=1'),                                 // just need count
+          api.get(`/orders?status=COMPLETED&limit=200`),
+          api.get('/orders?limit=6'),
+          api.get('/stock/levels?limit=50'),
+          api.get('/products?limit=1'),
         ])
 
         const todayOrders: Order[] = todayOrdersRes.data?.data ?? todayOrdersRes.data ?? []
         const recent: Order[] = recentRes.data?.data ?? recentRes.data ?? []
         const s: StockLevel[] = Array.isArray(stockRes.data) ? stockRes.data : stockRes.data?.data ?? []
 
-        setOrders(todayOrders)       // used for: todaySales, chart, topProducts
-        setRecentOrders(recent)      // used for: recent orders panel
+        setOrders(todayOrders)
+        setRecentOrders(recent)
         setStockLevels(s)
         const p = Array.isArray(productsRes.data) ? productsRes.data : productsRes.data?.data ?? []
-setTotalProducts(productsRes.data?.total ?? p.length)      // total count comes from pagination meta
+        setTotalProducts(productsRes.data?.total ?? p.length)
       } catch {
         setError('Failed to load dashboard data.')
       } finally {
@@ -102,7 +121,6 @@ setTotalProducts(productsRes.data?.total ?? p.length)      // total count comes 
   }, [])
 
   // ── derived stats ───────────────────────────────────────────────────────────
-  
   const todayCompleted = orders
   const todaySales = todayCompleted.reduce((s, o) => s + Number(o.total), 0)
   const lowStock = stockLevels.filter((s) => s.quantity <= s.low_stock_threshold)
@@ -147,7 +165,7 @@ setTotalProducts(productsRes.data?.total ?? p.length)      // total count comes 
   if (loading) {
     return (
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '60vh' }}>
-        <div style={{ width: 36, height: 36, borderRadius: '50%', border: '3px solid #f59e0b', borderTopColor: 'transparent', animation: 'spin 0.7s linear infinite' }} />
+        <div style={{ width: 32, height: 32, borderRadius: '50%', border: `3px solid ${colors.marigold}`, borderTopColor: 'transparent', animation: 'spin 0.7s linear infinite' }} />
         <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
       </div>
     )
@@ -155,7 +173,7 @@ setTotalProducts(productsRes.data?.total ?? p.length)      // total count comes 
 
   if (error) {
     return (
-      <div style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: 10, padding: 24, textAlign: 'center', color: '#f87171' }}>
+      <div style={{ fontFamily: fontBody, background: colors.brickBg, border: `0.5px solid ${colors.brick}`, borderRadius: 10, padding: 24, textAlign: 'center', color: colors.brick }}>
         {error}
       </div>
     )
@@ -166,127 +184,130 @@ setTotalProducts(productsRes.data?.total ?? p.length)      // total count comes 
 
       {/* Header */}
       <div>
-        <h1 style={{ color: '#f1f5f9', fontSize: 22, fontWeight: 700, margin: 0 }}>
-          {greeting()}, {user?.name?.split(' ')[0] ?? 'there'} 👋
+        <h1 style={{ fontFamily: fontDisplay, color: colors.paper, fontSize: 24, fontWeight: 500, margin: 0 }}>
+          {greeting()}, {user?.name?.split(' ')[0] ?? 'there'}
         </h1>
-        <p style={{ color: '#475569', fontSize: 13, marginTop: 4 }}>
+        <p style={{ fontFamily: fontBody, color: colors.sandMuted, fontSize: 13, marginTop: 4 }}>
           {new Date().toLocaleDateString('en-PH', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
         </p>
       </div>
 
-      {/* KPI Cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
+      {/* KPI Cards — color encodes meaning, not decoration: marigold = revenue, jade = healthy, brick = attention, sand = neutral count */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 16 }}>
         {[
-          { label: "Today's Sales", value: peso(todaySales), sub: 'Completed orders today', accent: '#f59e0b', icon: '₱' },
-          { label: 'Orders Today', value: String(todayCompleted.length), sub: 'Completed transactions', accent: '#818cf8', icon: '🧾' },
-          { label: 'Low Stock', value: String(lowStock.length), sub: 'Items below threshold', accent: lowStock.length > 0 ? '#f87171' : '#34d399', icon: '⚠️' },
-          { label: 'Total Products', value: String(totalProducts), sub: 'In catalog', accent: '#38bdf8', icon: '📦' },
+          { label: "Today's sales", value: peso(todaySales), sub: 'Completed orders today', color: colors.marigold },
+          { label: 'Orders today', value: String(todayCompleted.length), sub: 'Completed transactions', color: colors.paper },
+          { label: 'Low stock', value: String(lowStock.length), sub: 'Items below threshold', color: lowStock.length > 0 ? colors.brick : colors.jade },
+          { label: 'Total products', value: String(totalProducts), sub: 'In catalog', color: colors.paper },
         ].map((kpi) => (
           <div key={kpi.label} style={card()}>
             <div style={label}>{kpi.label}</div>
-            <div style={{ fontSize: 28, fontWeight: 800, color: kpi.accent, lineHeight: 1.1 }}>
+            <div style={{ fontFamily: fontMono, fontSize: 26, fontWeight: 500, color: kpi.color, lineHeight: 1.15 }}>
               {kpi.value}
             </div>
-            <div style={{ fontSize: 12, color: '#475569', marginTop: 6 }}>{kpi.sub}</div>
+            <div style={{ fontFamily: fontBody, fontSize: 12, color: colors.sandMuted, marginTop: 6 }}>{kpi.sub}</div>
           </div>
         ))}
       </div>
 
       {/* Chart + Recent Orders */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 380px', gap: 16 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: 16 }}>
 
         {/* Sales Chart */}
         <div style={card()}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
             <div>
-              <div style={label}>Sales Overview</div>
-              <div style={{ color: '#f1f5f9', fontSize: 22, fontWeight: 700 }}>
+              <div style={label}>Sales overview</div>
+              <div style={{ fontFamily: fontMono, color: colors.paper, fontSize: 22, fontWeight: 500 }}>
                 {peso(orders.filter(o => o.status === 'COMPLETED').reduce((s, o) => s + Number(o.total), 0))}
               </div>
-              <div style={{ color: '#475569', fontSize: 12 }}>All time revenue</div>
+              <div style={{ fontFamily: fontBody, color: colors.sandMuted, fontSize: 12 }}>All time revenue</div>
             </div>
-            <span style={{ background: 'rgba(245,158,11,0.12)', color: '#f59e0b', fontSize: 11, fontWeight: 700, padding: '4px 12px', borderRadius: 20 }}>
-              Last 7 Days
+            <span style={{ fontFamily: fontBody, background: colors.marigoldBg, color: colors.marigold, fontSize: 11, fontWeight: 600, padding: '4px 12px', borderRadius: 20 }}>
+              Last 7 days
             </span>
           </div>
           <ResponsiveContainer width="100%" height={200}>
             <BarChart data={chartData} barSize={28}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
-              <XAxis dataKey="label" tick={{ fill: '#475569', fontSize: 11 }} axisLine={false} tickLine={false} />
-              <YAxis tick={{ fill: '#475569', fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={(v) => `₱${v}`} />
+              <CartesianGrid strokeDasharray="3 3" stroke={colors.divider} vertical={false} />
+              <XAxis dataKey="label" tick={{ fill: colors.sandMuted, fontSize: 11, fontFamily: fontBody }} axisLine={false} tickLine={false} />
+              <YAxis tick={{ fill: colors.sandMuted, fontSize: 11, fontFamily: fontBody }} axisLine={false} tickLine={false} tickFormatter={(v) => `₱${v}`} />
               <Tooltip content={<CustomTooltip />} />
-              <Bar dataKey="Revenue" fill="#f59e0b" radius={[6, 6, 0, 0]} />
+              <Bar dataKey="Revenue" fill={colors.marigold} radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </div>
 
         {/* Recent Orders */}
         <div style={card({ padding: 0, overflow: 'hidden' })}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 20px', borderBottom: '1px solid #334155' }}>
-            <span style={{ color: '#f1f5f9', fontSize: 14, fontWeight: 600 }}>Recent Orders</span>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 20px', borderBottom: `0.5px solid ${colors.cardBorder}` }}>
+            <span style={{ fontFamily: fontBody, color: colors.paper, fontSize: 14, fontWeight: 500 }}>Recent orders</span>
             <button
               onClick={() => navigate('/orders')}
-              style={{ background: 'none', border: 'none', color: '#f59e0b', fontSize: 12, cursor: 'pointer', fontWeight: 600 }}
+              style={{ fontFamily: fontBody, background: 'none', border: 'none', color: colors.marigold, fontSize: 12, cursor: 'pointer', fontWeight: 600 }}
             >
               View all →
             </button>
           </div>
           <div>
             {recentOrders.length === 0 ? (
-              <div style={{ padding: '32px', textAlign: 'center', color: '#475569', fontSize: 13 }}>No orders yet.</div>
+              <div style={{ fontFamily: fontBody, padding: '32px', textAlign: 'center', color: colors.sandMuted, fontSize: 13 }}>No orders yet.</div>
             ) : (
-              recentOrders.map((o) => (
-                <div key={o.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 20px', borderBottom: '1px solid #1e293b' }}>
-                  <div>
-                    <div style={{ color: '#e2e8f0', fontSize: 13, fontWeight: 600 }}>#{o.id.slice(-6).toUpperCase()}</div>
-                    <div style={{ color: '#475569', fontSize: 11, marginTop: 2 }}>
-                      {o.cashier?.name ?? 'Cashier'} · {new Date(o.created_at).toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit' })}
+              recentOrders.map((o) => {
+                const statusColor = o.status === 'COMPLETED' ? colors.jade : o.status === 'VOIDED' ? colors.brick : colors.marigold
+                const statusBg = o.status === 'COMPLETED' ? colors.jadeBg : o.status === 'VOIDED' ? colors.brickBg : colors.marigoldBg
+                return (
+                  <div key={o.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 20px', borderBottom: `0.5px solid ${colors.divider}` }}>
+                    <div>
+                      <div style={{ fontFamily: fontMono, color: colors.paper, fontSize: 13, fontWeight: 500 }}>#{o.id.slice(-6).toUpperCase()}</div>
+                      <div style={{ fontFamily: fontBody, color: colors.sandMuted, fontSize: 11, marginTop: 2 }}>
+                        {o.cashier?.name ?? 'Cashier'} · {new Date(o.created_at).toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit' })}
+                      </div>
+                    </div>
+                    <div style={{ textAlign: 'right' }}>
+                      <div style={{ fontFamily: fontMono, color: colors.paper, fontSize: 13, fontWeight: 500 }}>{peso(Number(o.total))}</div>
+                      <span style={{
+                        fontFamily: fontBody, fontSize: 10, fontWeight: 600, padding: '2px 8px', borderRadius: 20, marginTop: 3, display: 'inline-block',
+                        background: statusBg, color: statusColor,
+                      }}>
+                        {o.status}
+                      </span>
                     </div>
                   </div>
-                  <div style={{ textAlign: 'right' }}>
-                    <div style={{ color: '#f1f5f9', fontSize: 13, fontWeight: 700 }}>{peso(Number(o.total))}</div>
-                    <span style={{
-                      fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 20, marginTop: 3, display: 'inline-block',
-                      background: o.status === 'COMPLETED' ? 'rgba(52,211,153,0.12)' : o.status === 'VOIDED' ? 'rgba(248,113,113,0.12)' : 'rgba(245,158,11,0.12)',
-                      color: o.status === 'COMPLETED' ? '#34d399' : o.status === 'VOIDED' ? '#f87171' : '#f59e0b',
-                    }}>
-                      {o.status}
-                    </span>
-                  </div>
-                </div>
-              ))
+                )
+              })
             )}
           </div>
         </div>
       </div>
 
       {/* Top Products + Low Stock */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 16 }}>
 
         {/* Top Selling Products */}
         <div style={card({ padding: 0, overflow: 'hidden' })}>
-          <div style={{ padding: '16px 20px', borderBottom: '1px solid #334155' }}>
-            <span style={{ color: '#f1f5f9', fontSize: 14, fontWeight: 600 }}>Top Selling Products</span>
+          <div style={{ padding: '16px 20px', borderBottom: `0.5px solid ${colors.cardBorder}` }}>
+            <span style={{ fontFamily: fontBody, color: colors.paper, fontSize: 14, fontWeight: 500 }}>Top selling products</span>
           </div>
           {topProducts.length === 0 ? (
-            <div style={{ padding: 32, textAlign: 'center', color: '#475569', fontSize: 13 }}>
+            <div style={{ fontFamily: fontBody, padding: 32, textAlign: 'center', color: colors.sandMuted, fontSize: 13 }}>
               No sales data yet. Process some orders to see top products.
             </div>
           ) : (
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
-                <tr style={{ background: '#0f172a' }}>
-                  {['Product', 'Units Sold', 'Revenue'].map((h) => (
-                    <th key={h} style={{ padding: '10px 20px', textAlign: h === 'Product' ? 'left' : 'right', fontSize: 11, fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{h}</th>
+                <tr style={{ background: colors.ink }}>
+                  {['Product', 'Units sold', 'Revenue'].map((h) => (
+                    <th key={h} style={{ fontFamily: fontBody, padding: '10px 20px', textAlign: h === 'Product' ? 'left' : 'right', fontSize: 11, fontWeight: 600, color: colors.sandMuted, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
                 {topProducts.map((p, i) => (
-                  <tr key={i} style={{ borderTop: '1px solid #1e293b' }}>
-                    <td style={{ padding: '12px 20px', color: '#e2e8f0', fontSize: 13 }}>{p.name}</td>
-                    <td style={{ padding: '12px 20px', color: '#94a3b8', fontSize: 13, textAlign: 'right' }}>{p.qty}</td>
-                    <td style={{ padding: '12px 20px', color: '#f59e0b', fontSize: 13, fontWeight: 700, textAlign: 'right' }}>{peso(p.revenue)}</td>
+                  <tr key={i} style={{ borderTop: `0.5px solid ${colors.divider}` }}>
+                    <td style={{ fontFamily: fontBody, padding: '12px 20px', color: colors.paper, fontSize: 13 }}>{p.name}</td>
+                    <td style={{ fontFamily: fontMono, padding: '12px 20px', color: colors.sand, fontSize: 13, textAlign: 'right' }}>{p.qty}</td>
+                    <td style={{ fontFamily: fontMono, padding: '12px 20px', color: colors.marigold, fontSize: 13, fontWeight: 500, textAlign: 'right' }}>{peso(p.revenue)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -296,29 +317,29 @@ setTotalProducts(productsRes.data?.total ?? p.length)      // total count comes 
 
         {/* Low Stock Alerts */}
         <div style={card({ padding: 0, overflow: 'hidden' })}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 20px', borderBottom: '1px solid #334155' }}>
-            <span style={{ color: '#f1f5f9', fontSize: 14, fontWeight: 600 }}>Low Stock Alerts</span>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 20px', borderBottom: `0.5px solid ${colors.cardBorder}` }}>
+            <span style={{ fontFamily: fontBody, color: colors.paper, fontSize: 14, fontWeight: 500 }}>Low stock alerts</span>
             <button
               onClick={() => navigate('/stock')}
-              style={{ background: 'none', border: 'none', color: '#f59e0b', fontSize: 12, cursor: 'pointer', fontWeight: 600 }}
+              style={{ fontFamily: fontBody, background: 'none', border: 'none', color: colors.marigold, fontSize: 12, cursor: 'pointer', fontWeight: 600 }}
             >
               Manage →
             </button>
           </div>
           {lowStock.length === 0 ? (
-            <div style={{ padding: 32, textAlign: 'center', color: '#34d399', fontSize: 13 }}>
+            <div style={{ fontFamily: fontBody, padding: 32, textAlign: 'center', color: colors.jade, fontSize: 13 }}>
               ✓ All stock levels are healthy
             </div>
           ) : (
             lowStock.slice(0, 6).map((s) => (
-              <div key={s.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 20px', borderBottom: '1px solid #1e293b' }}>
+              <div key={s.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 20px', borderBottom: `0.5px solid ${colors.divider}` }}>
                 <div>
-                  <div style={{ color: '#e2e8f0', fontSize: 13, fontWeight: 500 }}>{s.product.name}</div>
-                  <div style={{ color: '#475569', fontSize: 11, marginTop: 2 }}>{s.product.sku}</div>
+                  <div style={{ fontFamily: fontBody, color: colors.paper, fontSize: 13, fontWeight: 500 }}>{s.product.name}</div>
+                  <div style={{ fontFamily: fontMono, color: colors.sandMuted, fontSize: 11, marginTop: 2 }}>{s.product.sku}</div>
                 </div>
                 <div style={{ textAlign: 'right' }}>
-                  <div style={{ color: '#f87171', fontSize: 15, fontWeight: 800 }}>{s.quantity}</div>
-                  <div style={{ color: '#475569', fontSize: 11 }}>min {s.low_stock_threshold}</div>
+                  <div style={{ fontFamily: fontMono, color: colors.brick, fontSize: 15, fontWeight: 500 }}>{s.quantity}</div>
+                  <div style={{ fontFamily: fontBody, color: colors.sandMuted, fontSize: 11 }}>min {s.low_stock_threshold}</div>
                 </div>
               </div>
             ))

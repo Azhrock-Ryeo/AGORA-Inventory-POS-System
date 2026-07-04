@@ -2,6 +2,22 @@ import { useEffect, useState } from 'react'
 import api from '../../services/api'
 import { useAuthStore } from '../../stores/useAuthStore'
 
+// ── unified charcoal / white / amber theme (matches Sidebar/Topbar/Orders/Inventory/Stock/Reports/AuditLogs) ─
+const BG_BASE = '#18181b'
+const BG_CARD = '#1f1f23'
+const BORDER = 'rgba(255,255,255,0.08)'
+const TEXT_PRIMARY = '#f4f4f5'
+const TEXT_SECONDARY = '#a1a1aa'
+const TEXT_MUTED = '#71717a'
+const ACCENT = '#f59e0b'
+const SUCCESS = '#34d399'
+const SUCCESS_DIM = 'rgba(52,211,153,0.14)'
+const DANGER = '#f87171'
+const DANGER_DIM = 'rgba(248,113,113,0.14)'
+
+const fontDisplay = "'Fraunces', serif"
+const fontBody = "'Inter', sans-serif"
+
 type Role = 'SUPER_ADMIN' | 'ADMIN' | 'MANAGER' | 'CASHIER'
 
 interface User {
@@ -31,31 +47,34 @@ interface FormState {
 
 const ROLES: Role[] = ['SUPER_ADMIN', 'ADMIN', 'MANAGER', 'CASHIER']
 
-
 const ROLE_STYLE: Record<Role, { bg: string; color: string }> = {
-  SUPER_ADMIN: { bg: 'rgba(139,92,246,0.15)', color: '#a78bfa' },
-  ADMIN:       { bg: 'rgba(245,158,11,0.15)', color: '#f59e0b' },
-  MANAGER:     { bg: 'rgba(16,185,129,0.15)', color: '#34d399' },
-  CASHIER:     { bg: 'rgba(59,130,246,0.15)', color: '#60a5fa' },
+  SUPER_ADMIN: { bg: 'rgba(167,139,250,0.14)', color: '#a78bfa' },
+  ADMIN:       { bg: 'rgba(245,158,11,0.14)',  color: ACCENT },
+  MANAGER:     { bg: SUCCESS_DIM,              color: SUCCESS },
+  CASHIER:     { bg: 'rgba(96,165,250,0.14)',  color: '#60a5fa' },
 }
 
 const card: React.CSSProperties = {
-  background: '#1e293b', border: '1px solid #334155', borderRadius: 12, overflow: 'hidden',
+  fontFamily: fontBody,
+  background: BG_CARD, border: `1px solid ${BORDER}`, borderRadius: 12, overflow: 'hidden',
 }
 
 const inputStyle: React.CSSProperties = {
-  width: '100%', padding: '10px 12px', background: '#0f172a', border: '1px solid #334155',
-  borderRadius: 8, color: '#f1f5f9', fontSize: 13, boxSizing: 'border-box',
+  fontFamily: fontBody,
+  width: '100%', padding: '10px 12px', background: BG_BASE, border: `1px solid ${BORDER}`,
+  borderRadius: 8, color: TEXT_PRIMARY, fontSize: 13, boxSizing: 'border-box',
 }
 
 const btnPrimary: React.CSSProperties = {
-  padding: '10px 20px', background: '#f59e0b', border: 'none', borderRadius: 8,
-  color: '#0f172a', fontSize: 13, fontWeight: 700, cursor: 'pointer',
+  fontFamily: fontBody,
+  padding: '10px 20px', background: ACCENT, border: 'none', borderRadius: 8,
+  color: BG_BASE, fontSize: 13, fontWeight: 700, cursor: 'pointer',
 }
 
 const btnGhost: React.CSSProperties = {
-  padding: '10px 16px', background: 'transparent', border: '1px solid #334155',
-  borderRadius: 8, color: '#94a3b8', fontSize: 13, cursor: 'pointer',
+  fontFamily: fontBody,
+  padding: '10px 16px', background: 'transparent', border: `1px solid ${BORDER}`,
+  borderRadius: 8, color: TEXT_SECONDARY, fontSize: 13, cursor: 'pointer',
 }
 
 export default function UsersPage() {
@@ -148,18 +167,28 @@ const openEdit = (u: User) => {
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+    <div className="users-shell" style={{ display: 'flex', flexDirection: 'column', gap: 24, touchAction: 'pan-y' }}>
+      <style>{`
+        .users-shell { touch-action: pan-y; }
+        @media (max-width: 900px) {
+          .users-header { flex-direction: column !important; align-items: flex-start !important; gap: 12px; }
+          .users-stats { grid-template-columns: 1fr !important; }
+          .users-table-wrap { overflow-x: auto !important; overflow-y: hidden !important; -webkit-overflow-scrolling: touch; }
+          .users-table { min-width: 900px; }
+          .users-modal { width: min(92vw, 420px) !important; padding: 20px !important; }
+        }
+      `}</style>
       {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <div className="users-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div>
-          <h1 style={{ color: '#f1f5f9', fontSize: 22, fontWeight: 700, margin: 0 }}>Users</h1>
-          <p style={{ color: '#475569', fontSize: 13, marginTop: 4 }}>Manage system accounts and roles.</p>
+          <h1 style={{ fontFamily: fontDisplay, color: TEXT_PRIMARY, fontSize: 22, fontWeight: 500, margin: 0 }}>Users</h1>
+          <p style={{ fontFamily: fontBody, color: TEXT_MUTED, fontSize: 13, marginTop: 4 }}>Manage system accounts and roles.</p>
         </div>
         <button onClick={openCreate} style={btnPrimary}>+ Add User</button>
       </div>
 
       {/* Stats row */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
+      <div className="users-stats" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
         {ROLES.filter((role) => {
           if (me?.role === 'SUPER_ADMIN') return role !== 'SUPER_ADMIN'
           if (me?.role === 'ADMIN') return role !== 'SUPER_ADMIN' && role !== 'ADMIN'
@@ -169,25 +198,25 @@ const openEdit = (u: User) => {
           const s = ROLE_STYLE[role]
           return (
             <div key={role} style={{ ...card, padding: '16px 20px' }}>
-              <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', color: '#64748b' }}>
+              <div style={{ fontFamily: fontBody, fontSize: 11, fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', color: TEXT_MUTED }}>
                 {role.replace('_', ' ')}
               </div>
-              <div style={{ fontSize: 28, fontWeight: 800, color: s.color, marginTop: 4 }}>{count}</div>
+              <div style={{ fontFamily: fontBody, fontSize: 28, fontWeight: 800, color: s.color, marginTop: 4 }}>{count}</div>
             </div>
           )
         })}
       </div>
 
       {/* Table */}
-      <div style={card}>
+      <div className="users-table-wrap" style={card}>
         {loading ? (
-          <div style={{ padding: 40, textAlign: 'center', color: '#475569' }}>Loading...</div>
+          <div style={{ fontFamily: fontBody, padding: 40, textAlign: 'center', color: TEXT_MUTED }}>Loading...</div>
         ) : (
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <table className="users-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
-              <tr style={{ background: '#0f172a' }}>
+              <tr style={{ background: BG_BASE }}>
                 {['Name', 'Email', 'Role', 'Status', 'Joined', 'Actions'].map((h) => (
-                  <th key={h} style={{ padding: '12px 20px', textAlign: 'left', fontSize: 11, fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                  <th key={h} style={{ fontFamily: fontBody, padding: '12px 20px', textAlign: 'left', fontSize: 11, fontWeight: 700, color: TEXT_MUTED, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
                     {h}
                   </th>
                 ))}
@@ -195,34 +224,37 @@ const openEdit = (u: User) => {
             </thead>
             <tbody>
               {users.map((u) => {
-                const rs = ROLE_STYLE[getRole(u)] ?? { bg: 'rgba(148,163,184,0.15)', color: '#94a3b8' }
+                const rs = ROLE_STYLE[getRole(u)] ?? { bg: 'rgba(161,161,170,0.14)', color: TEXT_SECONDARY }
                 const isMe = u.id === me?.id
                 const isSuperAdmin = getRole(u) === 'SUPER_ADMIN'
                 const canEdit = !isSuperAdmin || me?.role === 'SUPER_ADMIN'
                 // Cannot deactivate yourself, and cannot deactivate a Super Admin unless you are one
                 const canToggle = !isMe && (!isSuperAdmin || me?.role === 'SUPER_ADMIN')
                 return (
-                  <tr key={u.id} style={{ borderTop: '1px solid #334155' }}>
-                    <td style={{ padding: '14px 20px', color: '#f1f5f9', fontSize: 13, fontWeight: 600 }}>
+                  <tr key={u.id}
+                    onMouseEnter={(e) => (e.currentTarget.style.background = BG_BASE)}
+                    onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+                    style={{ borderTop: `1px solid ${BORDER}` }}>
+                    <td style={{ fontFamily: fontBody, padding: '14px 20px', color: TEXT_PRIMARY, fontSize: 13, fontWeight: 600 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                        <div style={{ width: 32, height: 32, borderRadius: '50%', background: '#334155', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94a3b8', fontSize: 13, fontWeight: 700, flexShrink: 0 }}>
+                        <div style={{ width: 32, height: 32, borderRadius: '50%', background: BORDER, display: 'flex', alignItems: 'center', justifyContent: 'center', color: TEXT_SECONDARY, fontSize: 13, fontWeight: 700, flexShrink: 0 }}>
                           {u.name[0].toUpperCase()}
                         </div>
-                        {u.name} {isMe && <span style={{ fontSize: 10, color: '#475569', fontWeight: 400 }}>(you)</span>}
+                        {u.name} {isMe && <span style={{ fontSize: 10, color: TEXT_MUTED, fontWeight: 400 }}>(you)</span>}
                       </div>
                     </td>
-                    <td style={{ padding: '14px 20px', color: '#94a3b8', fontSize: 13 }}>{u.email}</td>
+                    <td style={{ fontFamily: fontBody, padding: '14px 20px', color: TEXT_SECONDARY, fontSize: 13 }}>{u.email}</td>
                     <td style={{ padding: '14px 20px' }}>
-                      <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 20, background: rs.bg, color: rs.color }}>
+                      <span style={{ fontFamily: fontBody, fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 20, background: rs.bg, color: rs.color }}>
                         {getRole(u).replace('_', ' ')}
                       </span>
                     </td>
                     <td style={{ padding: '14px 20px' }}>
-                      <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 20, background: u.is_active ? 'rgba(52,211,153,0.12)' : 'rgba(100,116,139,0.12)', color: u.is_active ? '#34d399' : '#64748b' }}>
+                      <span style={{ fontFamily: fontBody, fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 20, background: u.is_active ? SUCCESS_DIM : 'rgba(161,161,170,0.14)', color: u.is_active ? SUCCESS : TEXT_MUTED }}>
                         {u.is_active ? 'Active' : 'Inactive'}
                       </span>
                     </td>
-                    <td style={{ padding: '14px 20px', color: '#475569', fontSize: 12 }}>
+                    <td style={{ fontFamily: fontBody, padding: '14px 20px', color: TEXT_MUTED, fontSize: 12 }}>
                       {new Date(u.created_at).toLocaleDateString('en-PH')}
                     </td>
                     <td style={{ padding: '14px 20px' }}>
@@ -234,14 +266,14 @@ const openEdit = (u: User) => {
                           <>
                             <button
                               onClick={() => handleToggle(u)}
-                              style={{ ...btnGhost, padding: '6px 14px', fontSize: 12, color: u.is_active ? '#f87171' : '#34d399', borderColor: u.is_active ? 'rgba(248,113,113,0.3)' : 'rgba(52,211,153,0.3)' }}
+                              style={{ ...btnGhost, padding: '6px 14px', fontSize: 12, color: u.is_active ? DANGER : SUCCESS, borderColor: u.is_active ? 'rgba(248,113,113,0.3)' : 'rgba(52,211,153,0.3)' }}
                             >
                               {u.is_active ? 'Deactivate' : 'Activate'}
                             </button>
                             {me?.role === 'SUPER_ADMIN' && !isMe && !isSuperAdmin && (
                               <button
                                 onClick={() => handleDelete(u)}
-                                style={{ ...btnGhost, padding: '6px 14px', fontSize: 12, color: '#f87171', borderColor: 'rgba(248,113,113,0.3)' }}
+                                style={{ ...btnGhost, padding: '6px 14px', fontSize: 12, color: DANGER, borderColor: 'rgba(248,113,113,0.3)' }}
                               >
                                 Delete
                               </button>
@@ -254,7 +286,7 @@ const openEdit = (u: User) => {
                 )
               })}
               {users.length === 0 && (
-                <tr><td colSpan={6} style={{ padding: 40, textAlign: 'center', color: '#475569', fontSize: 13 }}>No users found.</td></tr>
+                <tr><td colSpan={6} style={{ fontFamily: fontBody, padding: 40, textAlign: 'center', color: TEXT_MUTED, fontSize: 13 }}>No users found.</td></tr>
               )}
             </tbody>
           </table>
@@ -264,8 +296,8 @@ const openEdit = (u: User) => {
       {/* Modal */}
       {modalOpen && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50 }}>
-          <div style={{ background: '#1e293b', border: '1px solid #334155', borderRadius: 16, padding: 28, width: 420, maxWidth: '90vw' }}>
-            <h2 style={{ color: '#f1f5f9', fontSize: 17, fontWeight: 700, margin: '0 0 20px' }}>
+          <div className="users-modal" style={{ background: BG_CARD, border: `1px solid ${BORDER}`, borderRadius: 16, padding: 28, width: 420, maxWidth: '90vw' }}>
+            <h2 style={{ fontFamily: fontDisplay, color: TEXT_PRIMARY, fontSize: 18, fontWeight: 500, margin: '0 0 20px' }}>
               {editing ? 'Edit User' : 'Add User'}
             </h2>
 
@@ -276,7 +308,7 @@ const openEdit = (u: User) => {
                 { label: editing ? 'New Password (leave blank to keep)' : 'Password', key: 'password', type: 'password', placeholder: '••••••••' },
               ].map(({ label, key, type, placeholder }) => (
                 <div key={key}>
-                  <label style={{ display: 'block', color: '#94a3b8', fontSize: 12, fontWeight: 600, marginBottom: 6 }}>{label}</label>
+                  <label style={{ fontFamily: fontBody, display: 'block', color: TEXT_SECONDARY, fontSize: 12, fontWeight: 600, marginBottom: 6 }}>{label}</label>
                   <input
                     type={type}
                     placeholder={placeholder}
@@ -288,13 +320,13 @@ const openEdit = (u: User) => {
               ))}
 
               <div>
-                <label style={{ display: 'block', color: '#94a3b8', fontSize: 12, fontWeight: 600, marginBottom: 6 }}>Role</label>
+                <label style={{ fontFamily: fontBody, display: 'block', color: TEXT_SECONDARY, fontSize: 12, fontWeight: 600, marginBottom: 6 }}>Role</label>
                 <select value={form.role} onChange={(e) => setForm((f) => ({ ...f, role: e.target.value as Role }))} style={inputStyle}>
                   {availableRoles.map((r) => <option key={r} value={r}>{r.replace('_', ' ')}</option>)}
                 </select>
               </div>
 
-              {error && <div style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: 8, padding: '10px 14px', color: '#f87171', fontSize: 13 }}>{error}</div>}
+              {error && <div style={{ fontFamily: fontBody, background: DANGER_DIM, border: '1px solid rgba(248,113,113,0.3)', borderRadius: 8, padding: '10px 14px', color: DANGER, fontSize: 13 }}>{error}</div>}
 
               <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 4 }}>
                 <button onClick={() => setModalOpen(false)} style={btnGhost}>Cancel</button>

@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../stores/useAuthStore'
 import type { Role } from '../types'
@@ -99,9 +100,27 @@ const NAV: NavItem[] = [
   },
 ]
 
+// ── unified charcoal / white / amber theme ────────────────────────────────────
+const colors = {
+  bg: '#18181b',
+  border: 'rgba(255,255,255,0.08)',
+  textPrimary: '#f4f4f5',
+  textMuted: '#71717a',
+  amber: '#f59e0b',
+  amberBg: 'rgba(245,158,11,0.14)',
+  danger: '#ef4444',
+  dangerBg: 'rgba(239,68,68,0.10)',
+}
+const fontDisplay = "'Fraunces', serif"
+const fontBody = "'Inter', sans-serif"
+
+export const SIDEBAR_RAIL_WIDTH = 72
+export const SIDEBAR_EXPANDED_WIDTH = 220
+
 export function Sidebar() {
   const { user, logout } = useAuthStore()
   const navigate = useNavigate()
+  const [expanded, setExpanded] = useState(false)
 
   const handleLogout = () => {
     logout()
@@ -112,94 +131,126 @@ export function Sidebar() {
     (item) => !item.roles || (user?.role && item.roles.includes(user.role as Role))
   )
 
+  const width = expanded ? SIDEBAR_EXPANDED_WIDTH : SIDEBAR_RAIL_WIDTH
+
   return (
     <div
+      onMouseEnter={() => setExpanded(true)}
+      onMouseLeave={() => setExpanded(false)}
       style={{
-        width: '220px',
-        minWidth: '220px',
-        background: '#0f172a',
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        zIndex: 100,
+        width,
+        height: '100vh',
+        background: colors.bg,
+        borderRight: `1px solid ${colors.border}`,
         display: 'flex',
         flexDirection: 'column',
-        height: '100vh',
+        overflow: 'hidden',
+        transition: 'width 0.18s ease',
+        boxShadow: expanded ? '4px 0 24px rgba(0,0,0,0.35)' : 'none',
       }}
     >
       {/* Logo */}
-      <div style={{ padding: '20px 20px 16px', borderBottom: '1px solid #1e293b' }}>
-        <div style={{ color: '#f59e0b', fontSize: '22px', fontWeight: 800, letterSpacing: '-0.5px' }}>
-          AGORA
+      <div
+        style={{
+          padding: expanded ? '20px 20px 16px' : '20px 0 16px',
+          borderBottom: `1px solid ${colors.border}`,
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: expanded ? 'flex-start' : 'center',
+          whiteSpace: 'nowrap',
+        }}
+      >
+        <div style={{ fontFamily: fontDisplay, color: colors.amber, fontSize: expanded ? '22px' : '20px', fontWeight: 600 }}>
+          {expanded ? 'AGORA' : 'A'}
         </div>
-        <div style={{ color: '#475569', fontSize: '11px', marginTop: '2px' }}>
-          Inventory & POS
-        </div>
+        {expanded && (
+          <div style={{ fontFamily: fontBody, color: colors.textMuted, fontSize: '11px', marginTop: '2px' }}>
+            Inventory & POS
+          </div>
+        )}
       </div>
 
       {/* Nav */}
-      <nav style={{ flex: 1, padding: '12px 8px', overflowY: 'auto' }}>
+      <nav style={{ flex: 1, padding: '12px 8px', overflowY: 'auto', overflowX: 'hidden' }}>
         {visibleNav.map((item) => (
           <NavLink
             key={item.to}
             to={item.to}
+            title={!expanded ? item.label : undefined}
             style={({ isActive }) => ({
+              fontFamily: fontBody,
               display: 'flex',
               alignItems: 'center',
               gap: '10px',
-              padding: '9px 12px',
+              padding: expanded ? '9px 12px' : '10px',
+              justifyContent: expanded ? 'flex-start' : 'center',
               borderRadius: '8px',
               marginBottom: '2px',
               textDecoration: 'none',
               fontSize: '13.5px',
               fontWeight: isActive ? 600 : 400,
-              color: isActive ? '#f59e0b' : '#94a3b8',
-              background: isActive ? 'rgba(245,158,11,0.1)' : 'transparent',
-              transition: 'all 0.15s',
+              color: isActive ? colors.amber : colors.textPrimary,
+              background: isActive ? colors.amberBg : 'transparent',
+              transition: 'background 0.15s, color 0.15s',
+              whiteSpace: 'nowrap',
             })}
           >
-            <span style={{ opacity: 0.85 }}>{item.icon}</span>
-            {item.label}
+            <span style={{ opacity: 0.9, flexShrink: 0 }}>{item.icon}</span>
+            {expanded && item.label}
           </NavLink>
         ))}
       </nav>
 
       {/* User + Logout */}
-      <div style={{ padding: '12px 8px', borderTop: '1px solid #1e293b' }}>
-        <div style={{ padding: '8px 12px', marginBottom: '4px' }}>
-          <div style={{ color: '#e2e8f0', fontSize: '13px', fontWeight: 600 }}>
-            {user?.name ?? '—'}
+      <div style={{ padding: '12px 8px', borderTop: `1px solid ${colors.border}` }}>
+        {expanded && (
+          <div style={{ padding: '8px 12px', marginBottom: '4px', whiteSpace: 'nowrap', overflow: 'hidden' }}>
+            <div style={{ fontFamily: fontBody, color: colors.textPrimary, fontSize: '13px', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              {user?.name ?? '—'}
+            </div>
+            <div style={{ fontFamily: fontBody, color: colors.textMuted, fontSize: '11px', marginTop: '2px' }}>
+              {user?.role?.replace('_', ' ')}
+            </div>
           </div>
-          <div style={{ color: '#475569', fontSize: '11px', marginTop: '2px' }}>
-            {user?.role?.replace('_', ' ')}
-          </div>
-        </div>
+        )}
         <button
           onClick={handleLogout}
+          title={!expanded ? 'Sign out' : undefined}
           style={{
+            fontFamily: fontBody,
             width: '100%',
             display: 'flex',
             alignItems: 'center',
             gap: '10px',
-            padding: '9px 12px',
+            padding: expanded ? '9px 12px' : '10px',
+            justifyContent: expanded ? 'flex-start' : 'center',
             borderRadius: '8px',
             border: 'none',
             background: 'transparent',
-            color: '#64748b',
+            color: colors.textMuted,
             fontSize: '13.5px',
             cursor: 'pointer',
             textAlign: 'left',
+            whiteSpace: 'nowrap',
           }}
           onMouseEnter={(e) => {
-            e.currentTarget.style.background = 'rgba(239,68,68,0.08)'
-            e.currentTarget.style.color = '#ef4444'
+            e.currentTarget.style.background = colors.dangerBg
+            e.currentTarget.style.color = colors.danger
           }}
           onMouseLeave={(e) => {
             e.currentTarget.style.background = 'transparent'
-            e.currentTarget.style.color = '#64748b'
+            e.currentTarget.style.color = colors.textMuted
           }}
         >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ flexShrink: 0 }}>
             <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
             <polyline points="16 17 21 12 16 7" /><line x1="21" y1="12" x2="9" y2="12" />
           </svg>
-          Sign out
+          {expanded && 'Sign out'}
         </button>
       </div>
     </div>

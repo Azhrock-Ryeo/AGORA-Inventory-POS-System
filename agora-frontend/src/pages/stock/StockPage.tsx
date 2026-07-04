@@ -1,30 +1,36 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import api from '../../services/api'
 
-// ── design tokens ────────────────────────────────────────────────────────────
-const BG_BASE = '#0f172a'
-const BG_CARD = '#1e293b'
-const BORDER = '#334155'
-const TEXT_PRIMARY = '#f1f5f9'
-const TEXT_SECONDARY = '#94a3b8'
-const TEXT_MUTED = '#475569'
+// ── unified charcoal / white / amber theme (matches Sidebar/Topbar/Orders/Inventory) ─
+const BG_BASE = '#18181b'
+const BG_CARD = '#1f1f23'
+const BORDER = 'rgba(255,255,255,0.08)'
+const TEXT_PRIMARY = '#f4f4f5'
+const TEXT_SECONDARY = '#a1a1aa'
+const TEXT_MUTED = '#71717a'
 const ACCENT = '#f59e0b'
+const ACCENT_DIM = 'rgba(245,158,11,0.14)'
 const SUCCESS = '#34d399'
-const SUCCESS_DIM = 'rgba(52,211,153,0.12)'
+const SUCCESS_DIM = 'rgba(52,211,153,0.14)'
 const DANGER = '#f87171'
-const DANGER_DIM = 'rgba(248,113,113,0.12)'
-const WARN = '#fbbf24'
-const WARN_DIM = 'rgba(251,191,36,0.12)'
+const DANGER_DIM = 'rgba(248,113,113,0.14)'
+// Low stock reuses ACCENT (amber already means "needs attention" everywhere
+// else in the app — a separate near-identical amber shade was redundant)
+
+const fontDisplay = "'Fraunces', serif"
+const fontBody = "'Inter', sans-serif"
 
 const card = (extra?: React.CSSProperties): React.CSSProperties => ({
   background: BG_CARD,
   border: `1px solid ${BORDER}`,
   borderRadius: '12px',
+  fontFamily: fontBody,
   ...extra,
 })
 
 const labelStyle: React.CSSProperties = {
+  fontFamily: fontBody,
   fontSize: '11px',
   fontWeight: 700,
   letterSpacing: '0.08em',
@@ -35,6 +41,7 @@ const labelStyle: React.CSSProperties = {
 }
 
 const inputStyle: React.CSSProperties = {
+  fontFamily: fontBody,
   background: BG_BASE,
   border: `1px solid ${BORDER}`,
   borderRadius: 8,
@@ -72,6 +79,8 @@ type ActiveTab = 'levels' | 'in' | 'out' | 'history'
 export default function StockPage() {
   const queryClient = useQueryClient()
   const [activeTab, setActiveTab] = useState<ActiveTab>('levels')
+  const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' ? window.innerWidth <= 900 : false)
+  const [touchStartX, setTouchStartX] = useState<number | null>(null)
 
   const [levelsSearch, setLevelsSearch] = useState('')
   const [showLowStockOnly, setShowLowStockOnly] = useState(false)
@@ -174,9 +183,38 @@ export default function StockPage() {
     { key: 'history', label: 'Movement History' },
   ]
 
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth <= 900)
+    handleResize()
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
+  }, [])
+
   const lowStockCount = stockLevels.filter((s) => s.quantity <= s.low_stock_threshold).length
 
+  const handleSwipeTab = (direction: 'left' | 'right') => {
+    if (!isMobile) return
+    const currentIndex = TABS.findIndex((t) => t.key === activeTab)
+    const nextIndex = direction === 'left'
+      ? (currentIndex + 1) % TABS.length
+      : (currentIndex - 1 + TABS.length) % TABS.length
+    setActiveTab(TABS[nextIndex].key)
+  }
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    setTouchStartX(e.touches[0].clientX)
+  }
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    if (touchStartX === null || !isMobile) return
+    const delta = e.changedTouches[0].clientX - touchStartX
+    if (delta > 70) handleSwipeTab('right')
+    if (delta < -70) handleSwipeTab('left')
+    setTouchStartX(null)
+  }
+
   const thStyle: React.CSSProperties = {
+    fontFamily: fontBody,
     padding: '12px 20px',
     textAlign: 'left',
     fontSize: 11,
@@ -188,24 +226,41 @@ export default function StockPage() {
   }
 
   const tdStyle: React.CSSProperties = {
+    fontFamily: fontBody,
     padding: '14px 20px',
     fontSize: 13,
     borderTop: `1px solid ${BORDER}`,
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+    <div
+      className="stock-shell"
+      onTouchStart={handleTouchStart}
+      onTouchEnd={handleTouchEnd}
+      style={{ display: 'flex', flexDirection: 'column', gap: 24, touchAction: 'pan-y' }}
+    >
+      <style>{`
+        .stock-shell { touch-action: pan-y; }
+        @media (max-width: 900px) {
+          .stock-shell { gap: 16px !important; }
+          .stock-toolbar { flex-direction: column !important; align-items: stretch !important; }
+          .stock-toolbar > div { width: 100% !important; }
+          .stock-tab-row { flex-wrap: wrap !important; }
+          .stock-table-wrap { overflow-x: auto !important; overflow-y: hidden !important; -webkit-overflow-scrolling: touch; }
+          .stock-table { min-width: 680px; }
+        }
+      `}</style>
 
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div>
-          <h1 style={{ color: TEXT_PRIMARY, fontSize: 22, fontWeight: 700, margin: 0 }}>Stock Management</h1>
-          <p style={{ color: TEXT_MUTED, fontSize: 13, marginTop: 4 }}>Track inventory levels and movements</p>
+          <h1 style={{ fontFamily: fontDisplay, color: TEXT_PRIMARY, fontSize: 22, fontWeight: 500, margin: 0 }}>Stock Management</h1>
+          <p style={{ fontFamily: fontBody, color: TEXT_MUTED, fontSize: 13, marginTop: 4 }}>Track inventory levels and movements</p>
         </div>
         {lowStockCount > 0 && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: DANGER_DIM, border: '1px solid rgba(248,113,113,0.3)', borderRadius: 8, padding: '8px 14px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: DANGER_DIM, border: `1px solid ${DANGER}`, borderRadius: 8, padding: '8px 14px' }}>
             <span style={{ width: 8, height: 8, borderRadius: '50%', background: DANGER, display: 'inline-block' }} />
-            <span style={{ fontSize: 13, color: DANGER, fontWeight: 600 }}>
+            <span style={{ fontFamily: fontBody, fontSize: 13, color: DANGER, fontWeight: 600 }}>
               {lowStockCount} low stock {lowStockCount === 1 ? 'item' : 'items'}
             </span>
           </div>
@@ -213,12 +268,13 @@ export default function StockPage() {
       </div>
 
       {/* Tab bar */}
-      <div style={{ display: 'flex', gap: 4, borderBottom: `1px solid ${BORDER}` }}>
+      <div className="stock-tab-row" style={{ display: 'flex', gap: 4, borderBottom: `1px solid ${BORDER}` }}>
         {TABS.map((t) => (
           <button
             key={t.key}
             onClick={() => setActiveTab(t.key)}
             style={{
+              fontFamily: fontBody,
               position: 'relative',
               padding: '10px 18px',
               fontSize: 13,
@@ -241,7 +297,7 @@ export default function StockPage() {
       {/* ── Stock Levels ── */}
       {activeTab === 'levels' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <div className="stock-toolbar" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             <input
               type="text"
               value={levelsSearch}
@@ -249,7 +305,7 @@ export default function StockPage() {
               placeholder="Search products…"
               style={{ ...inputStyle, width: 240 }}
             />
-            <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: TEXT_SECONDARY, cursor: 'pointer' }}>
+            <label style={{ fontFamily: fontBody, display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: TEXT_SECONDARY, cursor: 'pointer' }}>
               <input
                 type="checkbox"
                 checked={showLowStockOnly}
@@ -260,11 +316,11 @@ export default function StockPage() {
             </label>
           </div>
 
-          <div style={card({ overflow: 'hidden', padding: 0 })}>
+          <div className="stock-table-wrap" style={card({ overflow: 'hidden', padding: 0 })}>
             {levelsLoading ? (
-              <div style={{ padding: '48px', textAlign: 'center', color: TEXT_MUTED, fontSize: 13 }}>Loading…</div>
+              <div style={{ fontFamily: fontBody, padding: '48px', textAlign: 'center', color: TEXT_MUTED, fontSize: 13 }}>Loading…</div>
             ) : (
-              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <table className="stock-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <thead>
                   <tr>
                     {['Product', 'SKU', 'Category', 'Quantity', 'Threshold', 'Status'].map((h) => (
@@ -288,16 +344,17 @@ export default function StockPage() {
                         <td style={{ ...tdStyle, color: TEXT_SECONDARY, fontFamily: 'monospace', fontSize: 12 }}>{productSku}</td>
                         <td style={{ ...tdStyle, color: TEXT_SECONDARY }}>{categoryName}</td>
                         <td style={{ ...tdStyle }}>
-                          <span style={{ fontWeight: 800, fontSize: 16, color: isOut ? DANGER : isLow ? WARN : SUCCESS }}>
+                          <span style={{ fontFamily: fontBody, fontWeight: 800, fontSize: 16, color: isOut ? DANGER : isLow ? ACCENT : SUCCESS }}>
                             {level.quantity}
                           </span>
                         </td>
                         <td style={{ ...tdStyle, color: TEXT_MUTED }}>{level.low_stock_threshold}</td>
                         <td style={{ ...tdStyle }}>
                           <span style={{
+                            fontFamily: fontBody,
                             fontSize: 10, fontWeight: 700, padding: '3px 10px', borderRadius: 20,
-                            background: isOut ? DANGER_DIM : isLow ? WARN_DIM : SUCCESS_DIM,
-                            color: isOut ? DANGER : isLow ? WARN : SUCCESS,
+                            background: isOut ? DANGER_DIM : isLow ? ACCENT_DIM : SUCCESS_DIM,
+                            color: isOut ? DANGER : isLow ? ACCENT : SUCCESS,
                           }}>
                             {isOut ? 'Out of stock' : isLow ? 'Low stock' : 'In stock'}
                           </span>
@@ -306,7 +363,7 @@ export default function StockPage() {
                     )
                   })}
                   {stockLevels.length === 0 && (
-                    <tr><td colSpan={6} style={{ padding: '48px', textAlign: 'center', color: TEXT_MUTED, fontSize: 13 }}>No products found</td></tr>
+                    <tr><td colSpan={6} style={{ fontFamily: fontBody, padding: '48px', textAlign: 'center', color: TEXT_MUTED, fontSize: 13 }}>No products found</td></tr>
                   )}
                 </tbody>
               </table>
@@ -322,13 +379,13 @@ export default function StockPage() {
             <div style={{ display: 'flex', alignItems: 'center', gap: 12, paddingBottom: 20, marginBottom: 20, borderBottom: `1px solid ${BORDER}` }}>
               <div style={{ width: 40, height: 40, borderRadius: 10, background: SUCCESS_DIM, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, color: SUCCESS, fontWeight: 800 }}>+</div>
               <div>
-                <div style={{ color: TEXT_PRIMARY, fontSize: 15, fontWeight: 700 }}>Record Stock In</div>
-                <div style={{ color: TEXT_MUTED, fontSize: 12, marginTop: 2 }}>Add new inventory from a supplier</div>
+                <div style={{ fontFamily: fontBody, color: TEXT_PRIMARY, fontSize: 15, fontWeight: 700 }}>Record Stock In</div>
+                <div style={{ fontFamily: fontBody, color: TEXT_MUTED, fontSize: 12, marginTop: 2 }}>Add new inventory from a supplier</div>
               </div>
             </div>
 
             {inSuccess && (
-              <div style={{ background: SUCCESS_DIM, border: '1px solid rgba(52,211,153,0.3)', borderRadius: 8, padding: '12px 16px', fontSize: 13, color: SUCCESS, marginBottom: 16 }}>
+              <div style={{ fontFamily: fontBody, background: SUCCESS_DIM, border: `1px solid ${SUCCESS}`, borderRadius: 8, padding: '12px 16px', fontSize: 13, color: SUCCESS, marginBottom: 16 }}>
                 ✓ Stock-in recorded successfully
               </div>
             )}
@@ -350,9 +407,9 @@ export default function StockPage() {
                 <textarea value={inReason} onChange={(e) => setInReason(e.target.value)} placeholder="e.g. Delivery from Supplier ABC" rows={3}
                   style={{ ...inputStyle, resize: 'none', fontFamily: 'inherit' }} />
               </div>
-              {inError && <p style={{ color: DANGER, fontSize: 13, margin: 0 }}>{inError}</p>}
+              {inError && <p style={{ fontFamily: fontBody, color: DANGER, fontSize: 13, margin: 0 }}>{inError}</p>}
               <button onClick={handleStockIn} disabled={stockInMutation.isPending}
-                style={{ background: stockInMutation.isPending ? BORDER : SUCCESS, border: 'none', borderRadius: 8, padding: '12px', color: '#fff', fontSize: 13, fontWeight: 700, cursor: stockInMutation.isPending ? 'not-allowed' : 'pointer', transition: 'background 0.15s' }}>
+                style={{ fontFamily: fontBody, background: stockInMutation.isPending ? BORDER : SUCCESS, border: 'none', borderRadius: 8, padding: '12px', color: BG_BASE, fontSize: 13, fontWeight: 700, cursor: stockInMutation.isPending ? 'not-allowed' : 'pointer', transition: 'background 0.15s' }}>
                 {stockInMutation.isPending ? 'Recording…' : 'Record Stock In'}
               </button>
             </div>
@@ -367,13 +424,13 @@ export default function StockPage() {
             <div style={{ display: 'flex', alignItems: 'center', gap: 12, paddingBottom: 20, marginBottom: 20, borderBottom: `1px solid ${BORDER}` }}>
               <div style={{ width: 40, height: 40, borderRadius: 10, background: DANGER_DIM, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, color: DANGER, fontWeight: 800 }}>−</div>
               <div>
-                <div style={{ color: TEXT_PRIMARY, fontSize: 15, fontWeight: 700 }}>Record Stock Out</div>
-                <div style={{ color: TEXT_MUTED, fontSize: 12, marginTop: 2 }}>Manually deduct stock (e.g. damage, loss)</div>
+                <div style={{ fontFamily: fontBody, color: TEXT_PRIMARY, fontSize: 15, fontWeight: 700 }}>Record Stock Out</div>
+                <div style={{ fontFamily: fontBody, color: TEXT_MUTED, fontSize: 12, marginTop: 2 }}>Manually deduct stock (e.g. damage, loss)</div>
               </div>
             </div>
 
             {outSuccess && (
-              <div style={{ background: SUCCESS_DIM, border: '1px solid rgba(52,211,153,0.3)', borderRadius: 8, padding: '12px 16px', fontSize: 13, color: SUCCESS, marginBottom: 16 }}>
+              <div style={{ fontFamily: fontBody, background: SUCCESS_DIM, border: `1px solid ${SUCCESS}`, borderRadius: 8, padding: '12px 16px', fontSize: 13, color: SUCCESS, marginBottom: 16 }}>
                 ✓ Stock-out recorded successfully
               </div>
             )}
@@ -395,9 +452,9 @@ export default function StockPage() {
                 <textarea value={outReason} onChange={(e) => setOutReason(e.target.value)} placeholder="e.g. Damaged goods, expired items" rows={3}
                   style={{ ...inputStyle, resize: 'none', fontFamily: 'inherit' }} />
               </div>
-              {outError && <p style={{ color: DANGER, fontSize: 13, margin: 0 }}>{outError}</p>}
+              {outError && <p style={{ fontFamily: fontBody, color: DANGER, fontSize: 13, margin: 0 }}>{outError}</p>}
               <button onClick={handleStockOut} disabled={stockOutMutation.isPending}
-                style={{ background: stockOutMutation.isPending ? BORDER : DANGER, border: 'none', borderRadius: 8, padding: '12px', color: '#fff', fontSize: 13, fontWeight: 700, cursor: stockOutMutation.isPending ? 'not-allowed' : 'pointer', transition: 'background 0.15s' }}>
+                style={{ fontFamily: fontBody, background: stockOutMutation.isPending ? BORDER : DANGER, border: 'none', borderRadius: 8, padding: '12px', color: BG_BASE, fontSize: 13, fontWeight: 700, cursor: stockOutMutation.isPending ? 'not-allowed' : 'pointer', transition: 'background 0.15s' }}>
                 {stockOutMutation.isPending ? 'Recording…' : 'Record Stock Out'}
               </button>
             </div>
@@ -417,15 +474,15 @@ export default function StockPage() {
               <option value="STOCK_OUT">Stock Out</option>
             </select>
             <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} style={{ ...inputStyle, width: 'auto' }} />
-            <span style={{ color: TEXT_MUTED, fontSize: 13 }}>to</span>
+            <span style={{ fontFamily: fontBody, color: TEXT_MUTED, fontSize: 13 }}>to</span>
             <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} style={{ ...inputStyle, width: 'auto' }} />
           </div>
 
-          <div style={card({ overflow: 'hidden', padding: 0 })}>
+          <div className="stock-table-wrap" style={card({ overflow: 'hidden', padding: 0 })}>
             {movementsLoading ? (
-              <div style={{ padding: '48px', textAlign: 'center', color: TEXT_MUTED, fontSize: 13 }}>Loading…</div>
+              <div style={{ fontFamily: fontBody, padding: '48px', textAlign: 'center', color: TEXT_MUTED, fontSize: 13 }}>Loading…</div>
             ) : (
-              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <table className="stock-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <thead>
                   <tr>
                     {['Product', 'SKU', 'Type', 'Quantity', 'Reason', 'Date'].map((h) => (
@@ -444,6 +501,7 @@ export default function StockPage() {
                       <td style={{ ...tdStyle, color: TEXT_SECONDARY, fontFamily: 'monospace', fontSize: 12 }}>{mp.sku ?? '—'}</td>
                       <td style={{ ...tdStyle }}>
                         <span style={{
+                          fontFamily: fontBody,
                           fontSize: 10, fontWeight: 700, padding: '3px 10px', borderRadius: 20,
                           background: m.type === 'STOCK_IN' ? SUCCESS_DIM : DANGER_DIM,
                           color: m.type === 'STOCK_IN' ? SUCCESS : DANGER,
@@ -460,7 +518,7 @@ export default function StockPage() {
                     )
                   })}
                   {movements.length === 0 && (
-                    <tr><td colSpan={6} style={{ padding: '48px', textAlign: 'center', color: TEXT_MUTED, fontSize: 13 }}>No movements found</td></tr>
+                    <tr><td colSpan={6} style={{ fontFamily: fontBody, padding: '48px', textAlign: 'center', color: TEXT_MUTED, fontSize: 13 }}>No movements found</td></tr>
                   )}
                 </tbody>
               </table>
