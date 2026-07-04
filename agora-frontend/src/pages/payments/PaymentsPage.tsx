@@ -2,24 +2,29 @@ import React from 'react'
 import { useQuery } from '@tanstack/react-query'
 import api from '../../services/api'
 
-// ── design tokens ────────────────────────────────────────────────────────────
-const BG_BASE = '#0f172a'
-const BG_CARD = '#1e293b'
-const BORDER = '#334155'
-const TEXT_PRIMARY = '#f1f5f9'
-const TEXT_SECONDARY = '#94a3b8'
-const TEXT_MUTED = '#475569'
+// ── unified charcoal / white / amber theme (matches Sidebar/Topbar/Orders/Inventory/Stock) ─
+const BG_BASE = '#18181b'
+const BG_CARD = '#1f1f23'
+const BORDER = 'rgba(255,255,255,0.08)'
+const TEXT_PRIMARY = '#f4f4f5'
+const TEXT_SECONDARY = '#a1a1aa'
+const TEXT_MUTED = '#71717a'
 const ACCENT = '#f59e0b'
-const ACCENT_DIM = 'rgba(245,158,11,0.12)'
+const ACCENT_DIM = 'rgba(245,158,11,0.14)'
 const SUCCESS = '#34d399'
-const SUCCESS_DIM = 'rgba(52,211,153,0.12)'
+const SUCCESS_DIM = 'rgba(52,211,153,0.14)'
 const DANGER = '#f87171'
-const DANGER_DIM = 'rgba(248,113,113,0.12)'
+const DANGER_DIM = 'rgba(248,113,113,0.14)'
+const NEUTRAL_BG = 'rgba(255,255,255,0.06)'
+
+const fontDisplay = "'Fraunces', serif"
+const fontBody = "'Inter', sans-serif"
 
 const card = (extra?: React.CSSProperties): React.CSSProperties => ({
   background: BG_CARD,
   border: `1px solid ${BORDER}`,
   borderRadius: '12px',
+  fontFamily: fontBody,
   ...extra,
 })
 
@@ -63,11 +68,12 @@ export default function PaymentsPage() {
     const s = status.toLowerCase()
     if (s === 'completed') return { bg: SUCCESS_DIM, color: SUCCESS }
     if (s === 'failed' || s === 'unpaid') return { bg: DANGER_DIM, color: DANGER }
-    if (s === 'voided' || s === 'cancelled') return { bg: 'rgba(100,116,139,0.15)', color: TEXT_SECONDARY }
+    if (s === 'voided' || s === 'cancelled') return { bg: NEUTRAL_BG, color: TEXT_SECONDARY }
     return { bg: ACCENT_DIM, color: ACCENT }
   }
 
   const thStyle: React.CSSProperties = {
+    fontFamily: fontBody,
     padding: '12px 20px',
     textAlign: 'left',
     fontSize: 11,
@@ -79,6 +85,7 @@ export default function PaymentsPage() {
   }
 
   const tdStyle: React.CSSProperties = {
+    fontFamily: fontBody,
     padding: '14px 20px',
     fontSize: 13,
     borderTop: `1px solid ${BORDER}`,
@@ -89,23 +96,23 @@ export default function PaymentsPage() {
 
       {/* Header */}
       <div>
-        <h1 style={{ color: TEXT_PRIMARY, fontSize: 22, fontWeight: 700, margin: 0 }}>Payments</h1>
-        <p style={{ color: TEXT_MUTED, fontSize: 13, marginTop: 4 }}>Transaction history and payment records</p>
+        <h1 style={{ fontFamily: fontDisplay, color: TEXT_PRIMARY, fontSize: 22, fontWeight: 500, margin: 0 }}>Payments</h1>
+        <p style={{ fontFamily: fontBody, color: TEXT_MUTED, fontSize: 13, marginTop: 4 }}>Transaction history and payment records</p>
       </div>
 
-      {/* KPI strip */}
+      {/* KPI strip — color encodes meaning: amber = revenue, neutral = plain counts */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
         {[
           { label: 'Total Revenue', value: peso(totalRevenue), sub: 'All paid transactions', accent: ACCENT },
-          { label: 'Today\'s Transactions', value: String(todayCount), sub: 'Processed today', accent: '#818cf8' },
-          { label: 'Total Transactions', value: String(transactions.length), sub: 'All time', accent: '#38bdf8' },
+          { label: "Today's Transactions", value: String(todayCount), sub: 'Processed today', accent: TEXT_PRIMARY },
+          { label: 'Total Transactions', value: String(transactions.length), sub: 'All time', accent: TEXT_PRIMARY },
         ].map((kpi) => (
           <div key={kpi.label} style={card({ padding: 20 })}>
-            <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: TEXT_MUTED, marginBottom: 6 }}>
+            <div style={{ fontFamily: fontBody, fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: TEXT_MUTED, marginBottom: 6 }}>
               {kpi.label}
             </div>
-            <div style={{ fontSize: 28, fontWeight: 800, color: kpi.accent, lineHeight: 1.1 }}>{kpi.value}</div>
-            <div style={{ fontSize: 12, color: TEXT_MUTED, marginTop: 6 }}>{kpi.sub}</div>
+            <div style={{ fontFamily: fontBody, fontSize: 28, fontWeight: 700, color: kpi.accent, lineHeight: 1.1 }}>{kpi.value}</div>
+            <div style={{ fontFamily: fontBody, fontSize: 12, color: TEXT_MUTED, marginTop: 6 }}>{kpi.sub}</div>
           </div>
         ))}
       </div>
@@ -113,10 +120,10 @@ export default function PaymentsPage() {
       {/* Table */}
       <div style={card({ overflow: 'hidden', padding: 0 })}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 20px', borderBottom: `1px solid ${BORDER}` }}>
-          <span style={{ color: TEXT_PRIMARY, fontSize: 14, fontWeight: 600 }}>Transaction History</span>
+          <span style={{ fontFamily: fontBody, color: TEXT_PRIMARY, fontSize: 14, fontWeight: 600 }}>Transaction History</span>
         </div>
         {isLoading ? (
-          <div style={{ padding: '48px', textAlign: 'center', color: TEXT_MUTED, fontSize: 13 }}>Loading…</div>
+          <div style={{ fontFamily: fontBody, padding: '48px', textAlign: 'center', color: TEXT_MUTED, fontSize: 13 }}>Loading…</div>
         ) : (
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
@@ -144,7 +151,7 @@ export default function PaymentsPage() {
                     <td style={{ ...tdStyle, color: TEXT_SECONDARY }}>{peso(t.change)}</td>
                     <td style={{ ...tdStyle, color: TEXT_SECONDARY, textTransform: 'capitalize' }}>{t.payment_method}</td>
                     <td style={tdStyle}>
-                      <span style={{ fontSize: 10, fontWeight: 700, padding: '3px 10px', borderRadius: 20, background: sc.bg, color: sc.color }}>
+                      <span style={{ fontFamily: fontBody, fontSize: 10, fontWeight: 700, padding: '3px 10px', borderRadius: 20, background: sc.bg, color: sc.color }}>
                         {t.status}
                       </span>
                     </td>
@@ -156,7 +163,7 @@ export default function PaymentsPage() {
               })}
               {transactions.length === 0 && (
                 <tr>
-                  <td colSpan={8} style={{ padding: '48px', textAlign: 'center', color: TEXT_MUTED, fontSize: 13 }}>
+                  <td colSpan={8} style={{ fontFamily: fontBody, padding: '48px', textAlign: 'center', color: TEXT_MUTED, fontSize: 13 }}>
                     No transactions yet
                   </td>
                 </tr>

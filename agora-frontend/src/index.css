@@ -23,3 +23,25 @@ html, body {
   /* removed: fixed 1126px width + centering + border-inline
      that was capping the whole app to a boxed column */
 }
+
+body{
+    background:var(--bg);
+    color:var(--text);
+    font-family:Inter,sans-serif;
+}
+
+button{
+    font-family:inherit;
+}
+
+input{
+    font-family:inherit;
+}
+
+*{
+    transition:
+        background .2s,
+        color .2s,
+        border-color .2s,
+        box-shadow .2s;
+}

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import api from '../../services/api'
 import CameraScanner from '../../components/CameraScanner'
@@ -60,6 +60,9 @@ const SUCCESS_DIM = 'rgba(52,211,153,0.14)'
 const DANGER = '#f87171'
 const DANGER_DIM = 'rgba(248,113,113,0.14)'
 
+const fontDisplay = "'Fraunces', serif"
+const fontBody = "'Inter', sans-serif"
+
 const peso = (v: number) =>
   `₱${Number(v).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 
@@ -67,10 +70,12 @@ const card = (extra?: React.CSSProperties): React.CSSProperties => ({
   background: BG_CARD,
   border: `1px solid ${BORDER}`,
   borderRadius: '12px',
+  fontFamily: fontBody,
   ...extra,
 })
 
 const labelStyle: React.CSSProperties = {
+  fontFamily: fontBody,
   fontSize: '11px',
   fontWeight: 700,
   letterSpacing: '0.08em',
@@ -79,12 +84,21 @@ const labelStyle: React.CSSProperties = {
   marginBottom: '6px',
 }
 
+// stock status helper — traffic-light style for fast scanning
+const stockStatus = (stock: number) => {
+  if (stock <= 0) return { label: 'Out', dot: DANGER, bg: DANGER_DIM, color: DANGER }
+  if (stock <= 5) return { label: `${stock} left`, dot: ACCENT, bg: ACCENT_DIM, color: ACCENT }
+  return { label: `${stock} left`, dot: SUCCESS, bg: SUCCESS_DIM, color: SUCCESS }
+}
+
 export default function OrdersPage() {
   const queryClient = useQueryClient()
 
   const [activeTab, setActiveTab] = useState<ActiveTab>('pos')
   const [search, setSearch] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
+  const [searchFocused, setSearchFocused] = useState(false)
+  const searchInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearch(search), 300)
@@ -105,6 +119,9 @@ export default function OrdersPage() {
   const [scanError, setScanError] = useState('')
   // ── NEW: visible checkout failure state (this was the actual bug — mutation had no onError) ──
   const [checkoutError, setCheckoutError] = useState('')
+  // ── NEW: micro-interaction state ──
+  const [justAddedId, setJustAddedId] = useState<string | null>(null)
+  const [cartBump, setCartBump] = useState(false)
 
   const { data: products = [], isFetching: isSearching } = useQuery<Product[]>({
     queryKey: ['products', debouncedSearch],
@@ -176,6 +193,11 @@ export default function OrdersPage() {
       }
       return [...prev, { product, quantity: 1, unit_price: product.price }]
     })
+    // micro-animations: pop the card, bump the cart badge
+    setJustAddedId(product.id)
+    setTimeout(() => setJustAddedId(null), 220)
+    setCartBump(true)
+    setTimeout(() => setCartBump(false), 260)
   }
 
   const updateQty = (productId: string, qty: number) => {
@@ -274,8 +296,50 @@ export default function OrdersPage() {
   const receiptChange =
     completedOrder?.transaction?.change ?? (amountPaid - (completedOrder?.total ?? 0))
 
+  // ── keyboard shortcuts: Enter → checkout, Esc → clear search / close, F2 → focus search ──
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      const tag = (e.target as HTMLElement)?.tagName
+      const isTyping = tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT'
+
+      if (e.key === 'F2') {
+        e.preventDefault()
+        searchInputRef.current?.focus()
+        return
+      }
+      if (e.key === 'Escape') {
+        if (showPayment) { setShowPayment(false); setCheckoutError('') }
+        else if (showOrderDetail) setShowOrderDetail(false)
+        else if (search) setSearch('')
+        return
+      }
+      if (e.key === 'Enter' && !isTyping && activeTab === 'pos' && !showPayment && !showReceipt) {
+        if (cart.length > 0) handleCheckout()
+      }
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [showPayment, showOrderDetail, search, activeTab, cart, showReceipt])
+
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 0, height: '100%', minHeight: 0 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 0, height: '100%', minHeight: 0, fontFamily: fontBody }}>
+
+      {/* Local keyframes for micro-animations */}
+      <style>{`
+        @keyframes spin { to { transform: rotate(360deg) } }
+        @keyframes popIn { 0% { transform: scale(1); } 40% { transform: scale(0.94); } 100% { transform: scale(1); } }
+        @keyframes cartBump { 0% { transform: scale(1); } 35% { transform: scale(1.18); } 100% { transform: scale(1); } }
+        @keyframes fadeSlideIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes toastIn { from { opacity: 0; transform: translateX(16px); } to { opacity: 1; transform: translateX(0); } }
+        .product-card { transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease; }
+        .product-card:not(:disabled):hover { transform: translateY(-3px); box-shadow: 0 12px 24px -8px rgba(0,0,0,0.5); border-color: ${ACCENT} !important; }
+        .product-card:not(:disabled):active { transform: translateY(-1px) scale(0.98); }
+        .pop-added { animation: popIn 0.22s ease; }
+        .cart-item-in { animation: fadeSlideIn 0.2s ease; }
+        .btn-glow { transition: box-shadow 0.18s ease, transform 0.12s ease, background 0.15s ease; }
+        .btn-glow:not(:disabled):hover { box-shadow: 0 6px 18px -4px rgba(245,158,11,0.45); }
+        .btn-glow:not(:disabled):active { transform: scale(0.97); }
+      `}</style>
 
       {/* Error Toast (scan/stock/PDF errors) */}
       {scanError && (
@@ -284,6 +348,8 @@ export default function OrdersPage() {
           background: DANGER_DIM, border: `1px solid ${DANGER}`,
           borderRadius: 8, padding: '12px 16px', color: DANGER,
           fontSize: 13, fontWeight: 600, maxWidth: 300,
+          animation: 'toastIn 0.2s ease',
+          boxShadow: '0 8px 20px -6px rgba(0,0,0,0.5)',
         }}>
           {scanError}
         </div>
@@ -292,7 +358,7 @@ export default function OrdersPage() {
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
         <div>
-          <h1 style={{ color: TEXT_PRIMARY, fontSize: 22, fontWeight: 700, margin: 0 }}>Orders</h1>
+          <h1 style={{ fontFamily: fontDisplay, color: TEXT_PRIMARY, fontSize: 22, fontWeight: 500, margin: 0 }}>Orders</h1>
           <p style={{ color: TEXT_MUTED, fontSize: 13, marginTop: 4 }}>Point of Sale &amp; Order History</p>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
@@ -300,12 +366,12 @@ export default function OrdersPage() {
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
+              className="btn-glow"
               style={{
                 padding: '8px 20px', borderRadius: 8, fontSize: 13, fontWeight: 600,
                 border: 'none', cursor: 'pointer',
                 background: activeTab === tab ? ACCENT : BG_CARD,
-                color: activeTab === tab ? '#18181b' : TEXT_SECONDARY,
-                transition: 'all 0.15s',
+                color: activeTab === tab ? BG_BASE : TEXT_SECONDARY,
               }}
             >
               {tab === 'pos' ? 'POS' : 'Order History'}
@@ -318,21 +384,37 @@ export default function OrdersPage() {
       {activeTab === 'pos' && (
         <div style={{ display: 'flex', gap: 16, flex: 1, minHeight: 0, overflow: 'hidden' }}>
           {/* Product Grid */}
-          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 12, minHeight: 0 }}>
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 14, minHeight: 0 }}>
             <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
-              <input
-                type="text"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search products by name or SKU…"
-                style={{
-                  flex: 1, background: BG_CARD, border: `1px solid ${BORDER}`,
-                  borderRadius: 8, padding: '10px 14px', color: TEXT_PRIMARY,
-                  fontSize: 13, outline: 'none',
-                }}
-              />
+              <div style={{ position: 'relative', flex: 1 }}>
+                <span style={{
+                  position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)',
+                  fontSize: 14, color: searchFocused ? ACCENT : TEXT_MUTED, transition: 'color 0.15s', pointerEvents: 'none',
+                }}>
+                  🔍
+                </span>
+                <input
+                  ref={searchInputRef}
+                  type="text"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  onFocus={() => setSearchFocused(true)}
+                  onBlur={() => setSearchFocused(false)}
+                  placeholder="Search products by name or SKU…  (F2)"
+                  style={{
+                    width: '100%', boxSizing: 'border-box',
+                    background: BG_CARD,
+                    border: `1px solid ${searchFocused ? ACCENT : BORDER}`,
+                    borderRadius: 8, padding: '11px 14px 11px 38px', color: TEXT_PRIMARY,
+                    fontSize: 13, outline: 'none',
+                    boxShadow: searchFocused ? `0 0 0 3px ${ACCENT_DIM}` : 'none',
+                    transition: 'border-color 0.15s, box-shadow 0.15s',
+                  }}
+                />
+              </div>
               <button
                 onClick={() => setShowScanner(true)}
+                className="btn-glow"
                 style={{
                   background: ACCENT_DIM, border: `1px solid ${ACCENT}`,
                   borderRadius: 8, padding: '10px 16px', color: ACCENT,
@@ -344,38 +426,44 @@ export default function OrdersPage() {
             </div>
             <div style={{
               flex: 1, overflowY: 'auto', display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))',
-              gap: 12, alignContent: 'start',
+              gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))',
+              gap: 14, alignContent: 'start',
             }}>
               {products.map((product) => {
                 const stock = product.stock_level?.quantity ?? 0
                 const outOfStock = stock <= 0
+                const st = stockStatus(stock)
                 return (
                   <button
                     key={product.id}
                     onClick={() => !outOfStock && addToCart(product)}
                     disabled={outOfStock}
+                    className={`product-card${justAddedId === product.id ? ' pop-added' : ''}`}
                     style={{
-                      ...card({ padding: 16, textAlign: 'left', cursor: outOfStock ? 'not-allowed' : 'pointer', opacity: outOfStock ? 0.45 : 1, transition: 'border-color 0.15s' }),
+                      ...card({ padding: 20, textAlign: 'left', cursor: outOfStock ? 'not-allowed' : 'pointer', opacity: outOfStock ? 0.45 : 1 }),
                       background: BG_CARD,
+                      boxShadow: '0 1px 2px rgba(0,0,0,0.2)',
                     }}
-                    onMouseEnter={(e) => { if (!outOfStock) e.currentTarget.style.borderColor = ACCENT }}
-                    onMouseLeave={(e) => { e.currentTarget.style.borderColor = BORDER }}
                   >
-                    <div style={{ fontSize: 11, color: TEXT_MUTED, marginBottom: 4 }}>
+                    <span style={{
+                      display: 'inline-block', fontSize: 10, fontWeight: 700, color: TEXT_MUTED,
+                      background: BG_BASE, border: `1px solid ${BORDER}`, borderRadius: 20,
+                      padding: '2px 9px', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 10,
+                    }}>
                       {product.category?.name ?? 'Uncategorized'}
-                    </div>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: TEXT_PRIMARY, lineHeight: 1.3, marginBottom: 10 }}>
+                    </span>
+                    <div style={{ fontSize: 17, fontWeight: 700, color: TEXT_PRIMARY, lineHeight: 1.3, marginBottom: 12 }}>
                       {product.name}
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                      <span style={{ color: ACCENT, fontWeight: 700, fontSize: 13 }}>{peso(product.price)}</span>
+                      <span style={{ color: ACCENT, fontWeight: 800, fontSize: 20 }}>{peso(product.price)}</span>
                       <span style={{
-                        fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 20,
-                        background: outOfStock ? DANGER_DIM : stock <= 5 ? ACCENT_DIM : SUCCESS_DIM,
-                        color: outOfStock ? DANGER : stock <= 5 ? ACCENT : SUCCESS,
+                        display: 'flex', alignItems: 'center', gap: 5,
+                        fontSize: 10, fontWeight: 700, padding: '3px 9px', borderRadius: 20,
+                        background: st.bg, color: st.color,
                       }}>
-                        {outOfStock ? 'Out' : `${stock} left`}
+                        <span style={{ width: 6, height: 6, borderRadius: '50%', background: st.dot, display: 'inline-block' }} />
+                        {st.label}
                       </span>
                     </div>
                   </button>
@@ -383,7 +471,7 @@ export default function OrdersPage() {
               })}
               {isSearching && (
                 <div style={{ gridColumn: '1/-1', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '60px 0', color: TEXT_MUTED }}>
-                  <span style={{ fontSize: 36, marginBottom: 10 }}>⏳</span>
+                  <div style={{ width: 28, height: 28, borderRadius: '50%', border: `3px solid ${ACCENT}`, borderTopColor: 'transparent', animation: 'spin 0.7s linear infinite', marginBottom: 12 }} />
                   <p style={{ fontSize: 13 }}>Searching…</p>
                 </div>
               )}
@@ -397,36 +485,54 @@ export default function OrdersPage() {
           </div>
 
           {/* Cart Panel */}
-          <div style={card({ display: 'flex', flexDirection: 'column', width: 300, flexShrink: 0, overflow: 'hidden', padding: 0 })}>
-            <div style={{ padding: '16px 20px', borderBottom: `1px solid ${BORDER}` }}>
-              <div style={{ color: TEXT_PRIMARY, fontSize: 14, fontWeight: 600 }}>Cart</div>
-              <div style={{ color: TEXT_MUTED, fontSize: 12, marginTop: 2 }}>{cart.length} item(s)</div>
+          <div style={card({ display: 'flex', flexDirection: 'column', width: 300, flexShrink: 0, overflow: 'hidden', padding: 0, boxShadow: '0 4px 16px -6px rgba(0,0,0,0.4)' })}>
+            <div style={{ padding: '16px 20px', borderBottom: `1px solid ${BORDER}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div>
+                <div style={{ color: TEXT_PRIMARY, fontSize: 14, fontWeight: 600 }}>Cart</div>
+                <div style={{ color: TEXT_MUTED, fontSize: 12, marginTop: 2 }}>{cart.length} item(s)</div>
+              </div>
+              {cart.length > 0 && (
+                <span style={{
+                  display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                  minWidth: 24, height: 24, padding: '0 6px', borderRadius: 20,
+                  background: ACCENT, color: BG_BASE, fontSize: 12, fontWeight: 800,
+                  animation: cartBump ? 'cartBump 0.26s ease' : undefined,
+                }}>
+                  {cart.reduce((n, i) => n + i.quantity, 0)}
+                </span>
+              )}
             </div>
             <div style={{ flex: 1, overflowY: 'auto', padding: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
               {cart.length === 0 && (
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: 140, color: TEXT_MUTED }}>
-                  <span style={{ fontSize: 32, marginBottom: 8 }}>🛒</span>
-                  <p style={{ fontSize: 12 }}>Cart is empty</p>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: 200, color: TEXT_MUTED, textAlign: 'center', padding: '0 20px' }}>
+                  <span style={{ fontSize: 34, marginBottom: 10 }}>🛒</span>
+                  <p style={{ fontSize: 13, fontWeight: 600, color: TEXT_SECONDARY, margin: '0 0 4px' }}>No products added yet</p>
+                  <p style={{ fontSize: 12, margin: 0 }}>Click a product or scan a barcode</p>
                 </div>
               )}
               {cart.map((item) => (
-                <div key={item.product.id} style={{ background: BG_BASE, borderRadius: 8, padding: 12 }}>
+                <div key={item.product.id} className="cart-item-in" style={{ background: BG_BASE, borderRadius: 8, padding: 12, border: `1px solid ${BORDER}` }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
                     <span style={{ fontSize: 12, fontWeight: 600, color: TEXT_PRIMARY, flex: 1, paddingRight: 8, lineHeight: 1.3 }}>
                       {item.product.name}
                     </span>
-                    <button onClick={() => removeFromCart(item.product.id)} style={{ background: 'none', border: 'none', color: TEXT_MUTED, fontSize: 16, cursor: 'pointer', lineHeight: 1 }}>×</button>
+                    <button onClick={() => removeFromCart(item.product.id)} style={{ background: 'none', border: 'none', color: TEXT_MUTED, fontSize: 16, cursor: 'pointer', lineHeight: 1, transition: 'color 0.15s' }}
+                      onMouseEnter={(e) => (e.currentTarget.style.color = DANGER)}
+                      onMouseLeave={(e) => (e.currentTarget.style.color = TEXT_MUTED)}
+                    >×</button>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                       {([-1, null, 1] as (number | null)[]).map((delta, idx) =>
                         delta === null ? (
-                          <span key="qty" style={{ fontSize: 13, fontWeight: 600, color: TEXT_PRIMARY, width: 20, textAlign: 'center' }}>{item.quantity}</span>
+                          <span key="qty" style={{ fontSize: 13, fontWeight: 700, color: TEXT_PRIMARY, width: 20, textAlign: 'center' }}>{item.quantity}</span>
                         ) : (
                           <button
                             key={idx}
                             onClick={() => updateQty(item.product.id, item.quantity + (delta as number))}
-                            style={{ width: 24, height: 24, borderRadius: 6, border: `1px solid ${BORDER}`, background: BG_CARD, color: TEXT_SECONDARY, fontSize: 14, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                            style={{ width: 24, height: 24, borderRadius: 6, border: `1px solid ${BORDER}`, background: BG_CARD, color: TEXT_SECONDARY, fontSize: 14, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'border-color 0.15s, color 0.15s' }}
+                            onMouseEnter={(e) => { e.currentTarget.style.borderColor = ACCENT; e.currentTarget.style.color = ACCENT }}
+                            onMouseLeave={(e) => { e.currentTarget.style.borderColor = BORDER; e.currentTarget.style.color = TEXT_SECONDARY }}
                           >
                             {delta === -1 ? '−' : '+'}
                           </button>
@@ -479,16 +585,16 @@ export default function OrdersPage() {
               <button
                 onClick={handleCheckout}
                 disabled={cart.length === 0}
+                className="btn-glow"
                 style={{
                   background: cart.length === 0 ? BORDER : ACCENT,
-                  color: cart.length === 0 ? TEXT_MUTED : '#18181b',
-                  border: 'none', borderRadius: 8, padding: '12px',
+                  color: cart.length === 0 ? TEXT_MUTED : BG_BASE,
+                  border: 'none', borderRadius: 8, padding: '13px',
                   fontSize: 13, fontWeight: 700,
                   cursor: cart.length === 0 ? 'not-allowed' : 'pointer',
-                  transition: 'background 0.15s',
                 }}
               >
-                Proceed to Payment
+                Proceed to Payment {cart.length > 0 && '(Enter)'}
               </button>
             </div>
           </div>
@@ -513,7 +619,6 @@ export default function OrdersPage() {
             <div style={card({ padding: 48, textAlign: 'center', color: TEXT_MUTED })}>
               <div style={{ width: 28, height: 28, borderRadius: '50%', border: `3px solid ${ACCENT}`, borderTopColor: 'transparent', animation: 'spin 0.7s linear infinite', margin: '0 auto 12px' }} />
               <p style={{ fontSize: 13, margin: 0 }}>Loading orders…</p>
-              <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
             </div>
           )}
 
@@ -538,7 +643,10 @@ export default function OrdersPage() {
                   {orders.map((order) => {
                     const sc = statusColors(order.status)
                     return (
-                      <tr key={order.id} style={{ borderTop: `1px solid ${BORDER}` }}>
+                      <tr key={order.id}
+                        onMouseEnter={(e) => (e.currentTarget.style.background = BG_BASE)}
+                        onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+                        style={{ borderTop: `1px solid ${BORDER}`, transition: 'background 0.12s' }}>
                         <td style={{ padding: '14px 20px', fontFamily: 'monospace', fontSize: 12, color: TEXT_SECONDARY }}>#{order.id.slice(-8).toUpperCase()}</td>
                         <td style={{ padding: '14px 20px', color: TEXT_SECONDARY, fontSize: 13 }}>{new Date(order.created_at).toLocaleString('en-PH')}</td>
                         <td style={{ padding: '14px 20px', color: TEXT_SECONDARY, fontSize: 13 }}>{order.cashier?.name ?? '—'}</td>
@@ -565,8 +673,8 @@ export default function OrdersPage() {
       {/* Payment Modal */}
       {showPayment && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 50, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-          <div style={card({ padding: 28, width: '100%', maxWidth: 380 })}>
-            <h2 style={{ color: TEXT_PRIMARY, fontSize: 18, fontWeight: 700, margin: '0 0 20px' }}>Payment</h2>
+          <div style={{ ...card({ padding: 28, width: '100%', maxWidth: 380 }), animation: 'fadeSlideIn 0.18s ease' }}>
+            <h2 style={{ fontFamily: fontDisplay, color: TEXT_PRIMARY, fontSize: 18, fontWeight: 500, margin: '0 0 20px' }}>Payment</h2>
 
             {/* NEW: visible checkout failure banner — this is the fix for the actual bug */}
             {checkoutError && (
@@ -593,20 +701,20 @@ export default function OrdersPage() {
                 />
               </div>
               {amountPaid >= total && amountPaid > 0 && (
-                <div style={{ background: SUCCESS_DIM, border: `1px solid rgba(52,211,153,0.3)`, borderRadius: 8, padding: '12px 16px', display: 'flex', justifyContent: 'space-between' }}>
+                <div style={{ background: SUCCESS_DIM, border: `1px solid rgba(52,211,153,0.3)`, borderRadius: 8, padding: '12px 16px', display: 'flex', justifyContent: 'space-between', animation: 'fadeSlideIn 0.18s ease' }}>
                   <span style={{ color: SUCCESS, fontSize: 13 }}>Change</span>
                   <span style={{ color: SUCCESS, fontWeight: 800, fontSize: 18 }}>{peso(change)}</span>
                 </div>
               )}
               {amountPaid > 0 && amountPaid < total && (
-                <div style={{ background: DANGER_DIM, border: `1px solid rgba(248,113,113,0.3)`, borderRadius: 8, padding: '12px 16px' }}>
+                <div style={{ background: DANGER_DIM, border: `1px solid rgba(248,113,113,0.3)`, borderRadius: 8, padding: '12px 16px', animation: 'fadeSlideIn 0.18s ease' }}>
                   <p style={{ color: DANGER, fontSize: 13, margin: 0 }}>Insufficient — need {peso(total - amountPaid)} more</p>
                 </div>
               )}
             </div>
             <div style={{ display: 'flex', gap: 10 }}>
               <button onClick={() => { setShowPayment(false); setCheckoutError('') }} style={{ flex: 1, background: 'none', border: `1px solid ${BORDER}`, borderRadius: 8, padding: '12px', color: TEXT_SECONDARY, fontSize: 13, cursor: 'pointer' }}>Cancel</button>
-              <button onClick={handleConfirmPayment} disabled={amountPaid < total || createOrder.isPending} style={{ flex: 1, background: amountPaid < total ? BORDER : ACCENT, border: 'none', borderRadius: 8, padding: '12px', color: '#18181b', fontSize: 13, fontWeight: 700, cursor: amountPaid < total ? 'not-allowed' : 'pointer' }}>
+              <button onClick={handleConfirmPayment} disabled={amountPaid < total || createOrder.isPending} className="btn-glow" style={{ flex: 1, background: amountPaid < total ? BORDER : ACCENT, border: 'none', borderRadius: 8, padding: '12px', color: BG_BASE, fontSize: 13, fontWeight: 700, cursor: amountPaid < total ? 'not-allowed' : 'pointer' }}>
                 {createOrder.isPending ? 'Processing…' : 'Confirm Payment'}
               </button>
             </div>
@@ -617,11 +725,11 @@ export default function OrdersPage() {
       {/* Receipt Modal */}
       {showReceipt && completedOrder && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 50, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-          <div style={card({ padding: 28, width: '100%', maxWidth: 380 })}>
+          <div style={{ ...card({ padding: 28, width: '100%', maxWidth: 380 }), animation: 'fadeSlideIn 0.2s ease' }}>
             <div style={{ textAlign: 'center', marginBottom: 16 }}>
-              <div style={{ fontSize: 20, fontWeight: 800, color: ACCENT, letterSpacing: '0.05em' }}>AGORA</div>
+              <div style={{ fontFamily: fontDisplay, fontSize: 20, fontWeight: 600, color: ACCENT, letterSpacing: '0.05em' }}>AGORA</div>
               <div style={{ fontSize: 11, color: TEXT_MUTED, marginTop: 2 }}>Inventory &amp; POS System</div>
-              <div style={{ marginTop: 12, width: 40, height: 40, borderRadius: '50%', background: SUCCESS_DIM, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '12px auto 6px', fontSize: 20 }}>✓</div>
+              <div style={{ marginTop: 12, width: 40, height: 40, borderRadius: '50%', background: SUCCESS_DIM, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '12px auto 6px', fontSize: 20, animation: 'popIn 0.3s ease' }}>✓</div>
               <h2 style={{ color: TEXT_PRIMARY, fontSize: 16, fontWeight: 700, margin: '4px 0 0' }}>Payment Received</h2>
             </div>
             <div style={{ borderTop: `1px dashed ${BORDER}`, padding: '12px 0', display: 'flex', flexDirection: 'column', gap: 4 }}>
@@ -666,8 +774,8 @@ export default function OrdersPage() {
             </div>
             <div style={{ display: 'flex', gap: 10, marginTop: 20, paddingTop: 16, borderTop: `1px solid ${BORDER}` }}>
               <button onClick={() => window.print()} style={{ flex: 1, background: 'none', border: `1px solid ${BORDER}`, borderRadius: 8, padding: '12px', color: TEXT_SECONDARY, fontSize: 13, cursor: 'pointer' }}>Print</button>
-              <button onClick={() => downloadReceiptPDF(completedOrder.id)} style={{ flex: 1, background: BG_BASE, border: `1px solid ${ACCENT}`, borderRadius: 8, padding: '12px', color: ACCENT, fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>Download PDF</button>
-              <button onClick={handleNewOrder} style={{ flex: 1, background: ACCENT, border: 'none', borderRadius: 8, padding: '12px', color: '#18181b', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>New Order</button>
+              <button onClick={() => downloadReceiptPDF(completedOrder.id)} className="btn-glow" style={{ flex: 1, background: BG_BASE, border: `1px solid ${ACCENT}`, borderRadius: 8, padding: '12px', color: ACCENT, fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>Download PDF</button>
+              <button onClick={handleNewOrder} className="btn-glow" style={{ flex: 1, background: ACCENT, border: 'none', borderRadius: 8, padding: '12px', color: BG_BASE, fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>New Order</button>
             </div>
           </div>
         </div>
@@ -676,10 +784,10 @@ export default function OrdersPage() {
       {/* Order Detail Modal */}
       {showOrderDetail && selectedOrder && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 50, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-          <div style={card({ padding: 28, width: '100%', maxWidth: 420 })}>
+          <div style={{ ...card({ padding: 28, width: '100%', maxWidth: 420 }), animation: 'fadeSlideIn 0.18s ease' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 }}>
               <div>
-                <h2 style={{ color: TEXT_PRIMARY, fontSize: 18, fontWeight: 700, margin: 0 }}>Order Detail</h2>
+                <h2 style={{ fontFamily: fontDisplay, color: TEXT_PRIMARY, fontSize: 18, fontWeight: 500, margin: 0 }}>Order Detail</h2>
                 <p style={{ color: TEXT_MUTED, fontSize: 11, fontFamily: 'monospace', marginTop: 4 }}>#{selectedOrder.id.slice(-8).toUpperCase()}</p>
               </div>
               <button onClick={() => setShowOrderDetail(false)} style={{ background: 'none', border: 'none', color: TEXT_MUTED, fontSize: 20, cursor: 'pointer' }}>×</button>

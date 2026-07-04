@@ -5,27 +5,32 @@ import type { Product, Category, Supplier } from '../../types/inventory'
 
 type Tab = 'products' | 'categories' | 'suppliers'
 
-// ── design tokens ─────────────────────────────────────────────────────────────
-const BG_BASE    = '#0f172a'
-const BG_CARD    = '#1e293b'
-const BORDER     = '#334155'
-const TEXT_PRIMARY   = '#f1f5f9'
-const TEXT_SECONDARY = '#94a3b8'
-const TEXT_MUTED     = '#475569'
+// ── unified charcoal / white / amber theme (matches Sidebar/Topbar/OrdersPage) ─
+const BG_BASE    = '#18181b'
+const BG_CARD    = '#1f1f23'
+const BORDER     = 'rgba(255,255,255,0.08)'
+const TEXT_PRIMARY   = '#f4f4f5'
+const TEXT_SECONDARY = '#a1a1aa'
+const TEXT_MUTED     = '#71717a'
 const ACCENT     = '#f59e0b'
 const SUCCESS    = '#34d399'
-const SUCCESS_DIM = 'rgba(52,211,153,0.12)'
+const SUCCESS_DIM = 'rgba(52,211,153,0.14)'
 const DANGER     = '#f87171'
-const DANGER_DIM  = 'rgba(248,113,113,0.12)'
+const DANGER_DIM  = 'rgba(248,113,113,0.14)'
+
+const fontDisplay = "'Fraunces', serif"
+const fontBody = "'Inter', sans-serif"
 
 const card = (extra?: React.CSSProperties): React.CSSProperties => ({
   background: BG_CARD,
   border: `1px solid ${BORDER}`,
   borderRadius: '12px',
+  fontFamily: fontBody,
   ...extra,
 })
 
 const inputBase: React.CSSProperties = {
+  fontFamily: fontBody,
   background: BG_BASE,
   border: `1px solid ${BORDER}`,
   borderRadius: 8,
@@ -38,6 +43,7 @@ const inputBase: React.CSSProperties = {
 }
 
 const labelStyle: React.CSSProperties = {
+  fontFamily: fontBody,
   fontSize: 11,
   fontWeight: 700,
   letterSpacing: '0.08em',
@@ -48,6 +54,7 @@ const labelStyle: React.CSSProperties = {
 }
 
 const thStyle: React.CSSProperties = {
+  fontFamily: fontBody,
   padding: '12px 20px',
   textAlign: 'left',
   fontSize: 11,
@@ -59,6 +66,7 @@ const thStyle: React.CSSProperties = {
 }
 
 const tdStyle: React.CSSProperties = {
+  fontFamily: fontBody,
   padding: '14px 20px',
   fontSize: 13,
   borderTop: `1px solid ${BORDER}`,
@@ -91,7 +99,7 @@ function Modal({ open, onClose, title, children }: {
         style={card({ padding: 28, width: '100%', maxWidth: 480, maxHeight: '90vh', overflowY: 'auto' })}
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
-          <h2 style={{ color: TEXT_PRIMARY, fontSize: 17, fontWeight: 700, margin: 0 }}>{title}</h2>
+          <h2 style={{ fontFamily: fontDisplay, color: TEXT_PRIMARY, fontSize: 18, fontWeight: 500, margin: 0 }}>{title}</h2>
           <button onClick={onClose}
             style={{ background: 'none', border: 'none', color: TEXT_MUTED, fontSize: 22, cursor: 'pointer', lineHeight: 1 }}>
             ×
@@ -118,11 +126,11 @@ function FormActions({ onCancel, loading, label }: { onCancel: () => void; loadi
   return (
     <div style={{ display: 'flex', gap: 10, marginTop: 24 }}>
       <button onClick={onCancel}
-        style={{ flex: 1, background: 'none', border: `1px solid ${BORDER}`, borderRadius: 8, padding: '11px', color: TEXT_SECONDARY, fontSize: 13, cursor: 'pointer' }}>
+        style={{ fontFamily: fontBody, flex: 1, background: 'none', border: `1px solid ${BORDER}`, borderRadius: 8, padding: '11px', color: TEXT_SECONDARY, fontSize: 13, cursor: 'pointer' }}>
         Cancel
       </button>
       <button type="submit" disabled={loading}
-        style={{ flex: 1, background: ACCENT, border: 'none', borderRadius: 8, padding: '11px', color: '#fff', fontSize: 13, fontWeight: 700, cursor: loading ? 'not-allowed' : 'pointer', opacity: loading ? 0.7 : 1 }}>
+        style={{ fontFamily: fontBody, flex: 1, background: ACCENT, border: 'none', borderRadius: 8, padding: '11px', color: BG_BASE, fontSize: 13, fontWeight: 700, cursor: loading ? 'not-allowed' : 'pointer', opacity: loading ? 0.7 : 1 }}>
         {loading ? 'Saving…' : label}
       </button>
     </div>
@@ -173,7 +181,7 @@ function ProductForm({ product, categories, suppliers, onSave, onClose }: {
   return (
     <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
       {error && (
-        <div style={{ background: DANGER_DIM, border: '1px solid rgba(248,113,113,0.3)', borderRadius: 8, padding: '10px 14px', color: DANGER, fontSize: 13 }}>
+        <div style={{ fontFamily: fontBody, background: DANGER_DIM, border: `1px solid ${DANGER}`, borderRadius: 8, padding: '10px 14px', color: DANGER, fontSize: 13 }}>
           {error}
         </div>
       )}
@@ -240,7 +248,7 @@ function CategoryForm({ category, onSave, onClose }: {
 
   return (
     <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-      {error && <div style={{ background: DANGER_DIM, border: '1px solid rgba(248,113,113,0.3)', borderRadius: 8, padding: '10px 14px', color: DANGER, fontSize: 13 }}>{error}</div>}
+      {error && <div style={{ fontFamily: fontBody, background: DANGER_DIM, border: `1px solid ${DANGER}`, borderRadius: 8, padding: '10px 14px', color: DANGER, fontSize: 13 }}>{error}</div>}
       <Field label="Name">
         <input style={inputBase} value={form.name} onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))} placeholder="e.g. Canned Goods" />
       </Field>
@@ -280,7 +288,7 @@ function SupplierForm({ supplier, onSave, onClose }: {
 
   return (
     <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-      {error && <div style={{ background: DANGER_DIM, border: '1px solid rgba(248,113,113,0.3)', borderRadius: 8, padding: '10px 14px', color: DANGER, fontSize: 13 }}>{error}</div>}
+      {error && <div style={{ fontFamily: fontBody, background: DANGER_DIM, border: `1px solid ${DANGER}`, borderRadius: 8, padding: '10px 14px', color: DANGER, fontSize: 13 }}>{error}</div>}
       <Field label="Supplier name">
         <input style={inputBase} value={form.name} onChange={set('name')} placeholder="e.g. Unilever Philippines" />
       </Field>
@@ -317,7 +325,7 @@ function ConfirmModal({ open, message, onConfirm, onCancel }: {
             Cancel
           </button>
           <button onClick={onConfirm}
-            style={{ flex: 1, background: DANGER_DIM, border: '1px solid rgba(248,113,113,0.4)', borderRadius: 8, padding: 11, color: DANGER, fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>
+            style={{ flex: 1, background: DANGER_DIM, border: `1px solid ${DANGER}`, borderRadius: 8, padding: 11, color: DANGER, fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>
             Delete
           </button>
         </div>
@@ -493,8 +501,8 @@ export default function InventoryPage() {
 
       {/* Header */}
       <div>
-        <h1 style={{ color: TEXT_PRIMARY, fontSize: 22, fontWeight: 700, margin: 0 }}>Inventory</h1>
-        <p style={{ color: TEXT_MUTED, fontSize: 13, marginTop: 4 }}>
+        <h1 style={{ fontFamily: fontDisplay, color: TEXT_PRIMARY, fontSize: 22, fontWeight: 500, margin: 0 }}>Inventory</h1>
+        <p style={{ fontFamily: fontBody, color: TEXT_MUTED, fontSize: 13, marginTop: 4 }}>
           Manage your product catalog, categories, and suppliers.
         </p>
       </div>
@@ -504,6 +512,7 @@ export default function InventoryPage() {
         {TABS.map((t) => (
           <button key={t} onClick={() => setTab(t)}
             style={{
+              fontFamily: fontBody,
               position: 'relative', padding: '10px 18px', fontSize: 13, fontWeight: 600,
               textTransform: 'capitalize', background: 'none', border: 'none',
               cursor: 'pointer', color: tab === t ? ACCENT : TEXT_MUTED, transition: 'color 0.15s',
@@ -531,24 +540,24 @@ export default function InventoryPage() {
                 </svg>
                 <input type="text" value={search} onChange={(e) => setSearch(e.target.value)}
                   placeholder="Search name, SKU, or barcode"
-                  style={{ background: BG_CARD, border: `1px solid ${BORDER}`, borderRadius: 8, padding: '10px 14px', paddingLeft: 34, color: TEXT_PRIMARY, fontSize: 13, outline: 'none', width: 240 }} />
+                  style={{ fontFamily: fontBody, background: BG_CARD, border: `1px solid ${BORDER}`, borderRadius: 8, padding: '10px 14px', paddingLeft: 34, color: TEXT_PRIMARY, fontSize: 13, outline: 'none', width: 240 }} />
               </div>
               {/* Category filter */}
               <select value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)}
-                style={{ background: BG_CARD, border: `1px solid ${BORDER}`, borderRadius: 8, padding: '10px 14px', color: categoryFilter ? TEXT_PRIMARY : TEXT_MUTED, fontSize: 13, outline: 'none' }}>
+                style={{ fontFamily: fontBody, background: BG_CARD, border: `1px solid ${BORDER}`, borderRadius: 8, padding: '10px 14px', color: categoryFilter ? TEXT_PRIMARY : TEXT_MUTED, fontSize: 13, outline: 'none' }}>
                 <option value="">All categories</option>
                 {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
               </select>
               {(search || categoryFilter) && (
                 <button onClick={() => { setSearch(''); setCategoryFilter('') }}
-                  style={{ background: 'none', border: 'none', color: TEXT_MUTED, fontSize: 12, cursor: 'pointer', textDecoration: 'underline' }}>
+                  style={{ fontFamily: fontBody, background: 'none', border: 'none', color: TEXT_MUTED, fontSize: 12, cursor: 'pointer', textDecoration: 'underline' }}>
                   Clear filters
                 </button>
               )}
             </div>
             <button
               onClick={() => { setEditingProduct(null); setProductModal(true) }}
-              style={{ background: ACCENT, color: '#fff', border: 'none', borderRadius: 8, padding: '10px 18px', fontSize: 13, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}>
+              style={{ fontFamily: fontBody, background: ACCENT, color: BG_BASE, border: 'none', borderRadius: 8, padding: '10px 18px', fontSize: 13, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}>
               + Add product
             </button>
           </div>
@@ -556,7 +565,7 @@ export default function InventoryPage() {
           {/* Table */}
           <div style={{ ...card({ overflow: 'hidden', padding: 0 }), position: 'relative' }}>
             {loadingProducts && (
-              <div style={{ padding: 40, textAlign: 'center', color: TEXT_MUTED, fontSize: 13 }}>Loading…</div>
+              <div style={{ fontFamily: fontBody, padding: 40, textAlign: 'center', color: TEXT_MUTED, fontSize: 13 }}>Loading…</div>
             )}
             {!loadingProducts && (
               <table style={{ width: '100%', borderCollapse: 'collapse' }}>
@@ -575,15 +584,16 @@ export default function InventoryPage() {
                       <td style={{ ...tdStyle, color: TEXT_PRIMARY, fontWeight: 600 }}>{p.name}</td>
                       <td style={tdStyle}>
                         <div style={{ fontFamily: 'monospace', fontSize: 12, color: TEXT_SECONDARY }}>{p.sku}</div>
-                        {p.barcode && <div style={{ fontSize: 11, color: TEXT_MUTED, marginTop: 2 }}>{p.barcode}</div>}
+                        {p.barcode && <div style={{ fontFamily: fontBody, fontSize: 11, color: TEXT_MUTED, marginTop: 2 }}>{p.barcode}</div>}
                       </td>
                       <td style={{ ...tdStyle, color: TEXT_SECONDARY }}>{(p as any).category?.name ?? '—'}</td>
                       <td style={{ ...tdStyle, color: TEXT_SECONDARY }}>{(p as any).supplier?.name ?? '—'}</td>
                       <td style={{ ...tdStyle, color: TEXT_PRIMARY, fontWeight: 700, textAlign: 'right' }}>{peso(p.price)}</td>
                       <td style={{ ...tdStyle, textAlign: 'right' }}>
                         <span style={{
+                          fontFamily: fontBody,
                           fontSize: 10, fontWeight: 700, padding: '3px 10px', borderRadius: 20,
-                          background: p.status?.toUpperCase() === 'ACTIVE' ? SUCCESS_DIM : 'rgba(100,116,139,0.15)',
+                          background: p.status?.toUpperCase() === 'ACTIVE' ? SUCCESS_DIM : 'rgba(255,255,255,0.08)',
                           color: p.status?.toUpperCase() === 'ACTIVE' ? SUCCESS : TEXT_MUTED,
                         }}>
                           {p.status?.toUpperCase() === 'ACTIVE' ? 'Active' : 'Inactive'}
@@ -593,14 +603,15 @@ export default function InventoryPage() {
                         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 6 }}>
                           <button
                             onClick={() => { setEditingProduct(p); setProductModal(true) }}
-                            style={{ background: 'none', border: `1px solid ${BORDER}`, borderRadius: 6, padding: '4px 10px', fontSize: 12, color: TEXT_SECONDARY, cursor: 'pointer' }}>
+                            style={{ fontFamily: fontBody, background: 'none', border: `1px solid ${BORDER}`, borderRadius: 6, padding: '4px 10px', fontSize: 12, color: TEXT_SECONDARY, cursor: 'pointer' }}>
                             Edit
                           </button>
                           <button
                             onClick={() => toggleProductStatus.mutate(p)}
                             style={{
+                              fontFamily: fontBody,
                               background: 'none',
-                              border: `1px solid ${p.status?.toUpperCase() === 'ACTIVE' ? 'rgba(248,113,113,0.4)' : 'rgba(52,211,153,0.4)'}`,
+                              border: `1px solid ${p.status?.toUpperCase() === 'ACTIVE' ? DANGER : SUCCESS}`,
                               borderRadius: 6, padding: '4px 10px', fontSize: 12,
                               color: p.status?.toUpperCase() === 'ACTIVE' ? DANGER : SUCCESS,
                               cursor: 'pointer',
@@ -613,7 +624,7 @@ export default function InventoryPage() {
                   ))}
                   {filteredProducts.length === 0 && (
                     <tr>
-                      <td colSpan={7} style={{ padding: 48, textAlign: 'center', color: TEXT_MUTED, fontSize: 13 }}>
+                      <td colSpan={7} style={{ fontFamily: fontBody, padding: 48, textAlign: 'center', color: TEXT_MUTED, fontSize: 13 }}>
                         {search || categoryFilter ? 'No products match your filters.' : 'No products yet. Add one to get started.'}
                       </td>
                     </tr>
@@ -630,7 +641,7 @@ export default function InventoryPage() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
             <button onClick={() => { setEditingCategory(null); setCategoryModal(true) }}
-              style={{ background: ACCENT, color: '#fff', border: 'none', borderRadius: 8, padding: '10px 18px', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>
+              style={{ fontFamily: fontBody, background: ACCENT, color: BG_BASE, border: 'none', borderRadius: 8, padding: '10px 18px', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>
               + Add category
             </button>
           </div>
@@ -656,11 +667,11 @@ export default function InventoryPage() {
                     <td style={{ ...tdStyle, textAlign: 'right' }}>
                       <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 6 }}>
                         <button onClick={() => { setEditingCategory(c); setCategoryModal(true) }}
-                          style={{ background: 'none', border: `1px solid ${BORDER}`, borderRadius: 6, padding: '4px 10px', fontSize: 12, color: TEXT_SECONDARY, cursor: 'pointer' }}>
+                          style={{ fontFamily: fontBody, background: 'none', border: `1px solid ${BORDER}`, borderRadius: 6, padding: '4px 10px', fontSize: 12, color: TEXT_SECONDARY, cursor: 'pointer' }}>
                           Edit
                         </button>
                         <button onClick={() => handleDeleteCategory(c)}
-                          style={{ background: 'none', border: '1px solid rgba(248,113,113,0.4)', borderRadius: 6, padding: '4px 10px', fontSize: 12, color: DANGER, cursor: 'pointer' }}>
+                          style={{ fontFamily: fontBody, background: 'none', border: `1px solid ${DANGER}`, borderRadius: 6, padding: '4px 10px', fontSize: 12, color: DANGER, cursor: 'pointer' }}>
                           Delete
                         </button>
                       </div>
@@ -668,7 +679,7 @@ export default function InventoryPage() {
                   </tr>
                 ))}
                 {categories.length === 0 && (
-                  <tr><td colSpan={4} style={{ padding: 48, textAlign: 'center', color: TEXT_MUTED, fontSize: 13 }}>No categories yet.</td></tr>
+                  <tr><td colSpan={4} style={{ fontFamily: fontBody, padding: 48, textAlign: 'center', color: TEXT_MUTED, fontSize: 13 }}>No categories yet.</td></tr>
                 )}
               </tbody>
             </table>
@@ -681,7 +692,7 @@ export default function InventoryPage() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
             <button onClick={() => { setEditingSupplier(null); setSupplierModal(true) }}
-              style={{ background: ACCENT, color: '#fff', border: 'none', borderRadius: 8, padding: '10px 18px', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>
+              style={{ fontFamily: fontBody, background: ACCENT, color: BG_BASE, border: 'none', borderRadius: 8, padding: '10px 18px', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>
               + Add supplier
             </button>
           </div>
@@ -708,11 +719,11 @@ export default function InventoryPage() {
                     <td style={{ ...tdStyle, textAlign: 'right' }}>
                       <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 6 }}>
                         <button onClick={() => { setEditingSupplier(s); setSupplierModal(true) }}
-                          style={{ background: 'none', border: `1px solid ${BORDER}`, borderRadius: 6, padding: '4px 10px', fontSize: 12, color: TEXT_SECONDARY, cursor: 'pointer' }}>
+                          style={{ fontFamily: fontBody, background: 'none', border: `1px solid ${BORDER}`, borderRadius: 6, padding: '4px 10px', fontSize: 12, color: TEXT_SECONDARY, cursor: 'pointer' }}>
                           Edit
                         </button>
                         <button onClick={() => handleDeleteSupplier(s)}
-                          style={{ background: 'none', border: '1px solid rgba(248,113,113,0.4)', borderRadius: 6, padding: '4px 10px', fontSize: 12, color: DANGER, cursor: 'pointer' }}>
+                          style={{ fontFamily: fontBody, background: 'none', border: `1px solid ${DANGER}`, borderRadius: 6, padding: '4px 10px', fontSize: 12, color: DANGER, cursor: 'pointer' }}>
                           Delete
                         </button>
                       </div>
@@ -720,7 +731,7 @@ export default function InventoryPage() {
                   </tr>
                 ))}
                 {suppliers.length === 0 && (
-                  <tr><td colSpan={5} style={{ padding: 48, textAlign: 'center', color: TEXT_MUTED, fontSize: 13 }}>No suppliers yet.</td></tr>
+                  <tr><td colSpan={5} style={{ fontFamily: fontBody, padding: 48, textAlign: 'center', color: TEXT_MUTED, fontSize: 13 }}>No suppliers yet.</td></tr>
                 )}
               </tbody>
             </table>

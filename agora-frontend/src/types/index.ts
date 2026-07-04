@@ -37,3 +37,25 @@ export interface Order {
   createdAt: string
   items: OrderItem[]
 }
+
+body{
+    background:var(--bg);
+    color:var(--text);
+    font-family:Inter,sans-serif;
+}
+
+button{
+    font-family:inherit;
+}
+
+input{
+    font-family:inherit;
+}
+
+*{
+    transition:
+        background .2s,
+        color .2s,
+        border-color .2s,
+        box-shadow .2s;
+}
