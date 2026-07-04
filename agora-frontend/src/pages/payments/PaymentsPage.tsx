@@ -92,7 +92,15 @@ export default function PaymentsPage() {
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+    <div className="payments-shell" style={{ display: 'flex', flexDirection: 'column', gap: 24, touchAction: 'pan-y' }}>
+      <style>{`
+        .payments-shell { touch-action: pan-y; }
+        @media (max-width: 900px) {
+          .payments-kpis { grid-template-columns: 1fr !important; }
+          .payments-table-wrap { overflow-x: auto !important; overflow-y: hidden !important; -webkit-overflow-scrolling: touch; }
+          .payments-table { min-width: 900px; }
+        }
+      `}</style>
 
       {/* Header */}
       <div>
@@ -101,7 +109,7 @@ export default function PaymentsPage() {
       </div>
 
       {/* KPI strip — color encodes meaning: amber = revenue, neutral = plain counts */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
+      <div className="payments-kpis" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
         {[
           { label: 'Total Revenue', value: peso(totalRevenue), sub: 'All paid transactions', accent: ACCENT },
           { label: "Today's Transactions", value: String(todayCount), sub: 'Processed today', accent: TEXT_PRIMARY },
@@ -118,14 +126,14 @@ export default function PaymentsPage() {
       </div>
 
       {/* Table */}
-      <div style={card({ overflow: 'hidden', padding: 0 })}>
+      <div className="payments-table-wrap" style={card({ overflow: 'hidden', padding: 0 })}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 20px', borderBottom: `1px solid ${BORDER}` }}>
           <span style={{ fontFamily: fontBody, color: TEXT_PRIMARY, fontSize: 14, fontWeight: 600 }}>Transaction History</span>
         </div>
         {isLoading ? (
           <div style={{ fontFamily: fontBody, padding: '48px', textAlign: 'center', color: TEXT_MUTED, fontSize: 13 }}>Loading…</div>
         ) : (
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <table className="payments-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr>
                 {['Transaction ID', 'Order ID', 'Cashier', 'Amount Paid', 'Change', 'Method', 'Status', 'Date'].map((h) => (

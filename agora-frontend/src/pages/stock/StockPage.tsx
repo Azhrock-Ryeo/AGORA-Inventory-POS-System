@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import api from '../../services/api'
 
@@ -79,6 +79,8 @@ type ActiveTab = 'levels' | 'in' | 'out' | 'history'
 export default function StockPage() {
   const queryClient = useQueryClient()
   const [activeTab, setActiveTab] = useState<ActiveTab>('levels')
+  const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' ? window.innerWidth <= 900 : false)
+  const [touchStartX, setTouchStartX] = useState<number | null>(null)
 
   const [levelsSearch, setLevelsSearch] = useState('')
   const [showLowStockOnly, setShowLowStockOnly] = useState(false)
@@ -181,7 +183,35 @@ export default function StockPage() {
     { key: 'history', label: 'Movement History' },
   ]
 
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth <= 900)
+    handleResize()
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
+  }, [])
+
   const lowStockCount = stockLevels.filter((s) => s.quantity <= s.low_stock_threshold).length
+
+  const handleSwipeTab = (direction: 'left' | 'right') => {
+    if (!isMobile) return
+    const currentIndex = TABS.findIndex((t) => t.key === activeTab)
+    const nextIndex = direction === 'left'
+      ? (currentIndex + 1) % TABS.length
+      : (currentIndex - 1 + TABS.length) % TABS.length
+    setActiveTab(TABS[nextIndex].key)
+  }
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    setTouchStartX(e.touches[0].clientX)
+  }
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    if (touchStartX === null || !isMobile) return
+    const delta = e.changedTouches[0].clientX - touchStartX
+    if (delta > 70) handleSwipeTab('right')
+    if (delta < -70) handleSwipeTab('left')
+    setTouchStartX(null)
+  }
 
   const thStyle: React.CSSProperties = {
     fontFamily: fontBody,
@@ -203,7 +233,23 @@ export default function StockPage() {
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+    <div
+      className="stock-shell"
+      onTouchStart={handleTouchStart}
+      onTouchEnd={handleTouchEnd}
+      style={{ display: 'flex', flexDirection: 'column', gap: 24, touchAction: 'pan-y' }}
+    >
+      <style>{`
+        .stock-shell { touch-action: pan-y; }
+        @media (max-width: 900px) {
+          .stock-shell { gap: 16px !important; }
+          .stock-toolbar { flex-direction: column !important; align-items: stretch !important; }
+          .stock-toolbar > div { width: 100% !important; }
+          .stock-tab-row { flex-wrap: wrap !important; }
+          .stock-table-wrap { overflow-x: auto !important; overflow-y: hidden !important; -webkit-overflow-scrolling: touch; }
+          .stock-table { min-width: 680px; }
+        }
+      `}</style>
 
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -222,7 +268,7 @@ export default function StockPage() {
       </div>
 
       {/* Tab bar */}
-      <div style={{ display: 'flex', gap: 4, borderBottom: `1px solid ${BORDER}` }}>
+      <div className="stock-tab-row" style={{ display: 'flex', gap: 4, borderBottom: `1px solid ${BORDER}` }}>
         {TABS.map((t) => (
           <button
             key={t.key}
@@ -251,7 +297,7 @@ export default function StockPage() {
       {/* ── Stock Levels ── */}
       {activeTab === 'levels' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <div className="stock-toolbar" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             <input
               type="text"
               value={levelsSearch}
@@ -270,11 +316,11 @@ export default function StockPage() {
             </label>
           </div>
 
-          <div style={card({ overflow: 'hidden', padding: 0 })}>
+          <div className="stock-table-wrap" style={card({ overflow: 'hidden', padding: 0 })}>
             {levelsLoading ? (
               <div style={{ fontFamily: fontBody, padding: '48px', textAlign: 'center', color: TEXT_MUTED, fontSize: 13 }}>Loading…</div>
             ) : (
-              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <table className="stock-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <thead>
                   <tr>
                     {['Product', 'SKU', 'Category', 'Quantity', 'Threshold', 'Status'].map((h) => (
@@ -432,11 +478,11 @@ export default function StockPage() {
             <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} style={{ ...inputStyle, width: 'auto' }} />
           </div>
 
-          <div style={card({ overflow: 'hidden', padding: 0 })}>
+          <div className="stock-table-wrap" style={card({ overflow: 'hidden', padding: 0 })}>
             {movementsLoading ? (
               <div style={{ fontFamily: fontBody, padding: '48px', textAlign: 'center', color: TEXT_MUTED, fontSize: 13 }}>Loading…</div>
             ) : (
-              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <table className="stock-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <thead>
                   <tr>
                     {['Product', 'SKU', 'Type', 'Quantity', 'Reason', 'Date'].map((h) => (

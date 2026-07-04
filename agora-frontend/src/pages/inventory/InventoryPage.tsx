@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import api from '../../services/api'
 import type { Product, Category, Supplier } from '../../types/inventory'
@@ -124,7 +124,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 // ── Form buttons ──────────────────────────────────────────────────────────────
 function FormActions({ onCancel, loading, label }: { onCancel: () => void; loading: boolean; label: string }) {
   return (
-    <div style={{ display: 'flex', gap: 10, marginTop: 24 }}>
+    <div className="inventory-form-actions" style={{ display: 'flex', gap: 10, marginTop: 24 }}>
       <button onClick={onCancel}
         style={{ fontFamily: fontBody, flex: 1, background: 'none', border: `1px solid ${BORDER}`, borderRadius: 8, padding: '11px', color: TEXT_SECONDARY, fontSize: 13, cursor: 'pointer' }}>
         Cancel
@@ -196,7 +196,7 @@ function ProductForm({ product, categories, suppliers, onSave, onClose }: {
           <input style={inputBase} value={form.barcode} onChange={set('barcode')} placeholder="e.g. 4901427030505" />
         </Field>
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+      <div className="inventory-form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
         <Field label="Category">
           <select style={inputBase} value={form.categoryId} onChange={set('categoryId')}>
             <option value="">Select category</option>
@@ -210,7 +210,7 @@ function ProductForm({ product, categories, suppliers, onSave, onClose }: {
           </select>
         </Field>
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+      <div className="inventory-form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
         <Field label="Price (₱)">
           <input style={inputBase} type="number" min={0} step="0.01" value={form.price} onChange={set('price')} placeholder="0.00" />
         </Field>
@@ -341,6 +341,8 @@ export default function InventoryPage() {
   const [tab, setTab] = useState<Tab>('products')
   const [search, setSearch] = useState('')
   const [categoryFilter, setCategoryFilter] = useState('')
+  const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' ? window.innerWidth <= 900 : false)
+  const [touchStartX, setTouchStartX] = useState<number | null>(null)
 
   // modal state
   const [productModal, setProductModal] = useState(false)
@@ -494,10 +496,60 @@ export default function InventoryPage() {
     })
   }, [products, search, categoryFilter])
 
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth <= 900)
+    handleResize()
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
+  }, [])
+
   const TABS: Tab[] = ['products', 'categories', 'suppliers']
 
+  const handleSwipeTab = (direction: 'left' | 'right') => {
+    if (!isMobile) return
+    const currentIndex = TABS.indexOf(tab)
+    const nextIndex = direction === 'left'
+      ? (currentIndex + 1) % TABS.length
+      : (currentIndex - 1 + TABS.length) % TABS.length
+    setTab(TABS[nextIndex])
+  }
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    setTouchStartX(e.touches[0].clientX)
+  }
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    if (touchStartX === null || !isMobile) return
+    const delta = e.changedTouches[0].clientX - touchStartX
+    if (delta > 70) handleSwipeTab('right')
+    if (delta < -70) handleSwipeTab('left')
+    setTouchStartX(null)
+  }
+
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+    <div
+      className="inventory-shell"
+      onTouchStart={handleTouchStart}
+      onTouchEnd={handleTouchEnd}
+      style={{ display: 'flex', flexDirection: 'column', gap: 24, touchAction: 'pan-y' }}
+    >
+      <style>{`
+        .inventory-shell { touch-action: pan-y; }
+        @media (max-width: 900px) {
+          .inventory-shell { gap: 16px !important; }
+          .inventory-toolbar { flex-direction: column !important; align-items: stretch !important; }
+          .inventory-toolbar > div { width: 100% !important; max-width: none !important; }
+          .inventory-toolbar input, .inventory-toolbar select, .inventory-toolbar button.inventory-actions { width: 100% !important; }
+          .inventory-table-wrap { overflow-x: auto !important; overflow-y: hidden !important; -webkit-overflow-scrolling: touch; }
+          .inventory-table { min-width: 680px; }
+          .inventory-form-grid { grid-template-columns: 1fr !important; }
+          .inventory-form-actions { flex-direction: column !important; }
+        }
+        @media (max-width: 640px) {
+          .inventory-tab-row { overflow-x: visible; }
+          .inventory-tab-row button { white-space: nowrap; }
+        }
+      `}</style>
 
       {/* Header */}
       <div>
@@ -508,7 +560,7 @@ export default function InventoryPage() {
       </div>
 
       {/* Tab bar */}
-      <div style={{ display: 'flex', gap: 4, borderBottom: `1px solid ${BORDER}` }}>
+      <div className="inventory-tab-row" style={{ display: 'flex', gap: 4, borderBottom: `1px solid ${BORDER}` }}>
         {TABS.map((t) => (
           <button key={t} onClick={() => setTab(t)}
             style={{
@@ -530,8 +582,8 @@ export default function InventoryPage() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
 
           {/* Toolbar */}
-          <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
-            <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 10 }}>
+          <div className="inventory-toolbar" style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 10, width: '100%', maxWidth: 620 }}>
               {/* Search */}
               <div style={{ position: 'relative' }}>
                 <svg style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: TEXT_MUTED, pointerEvents: 'none' }}
@@ -556,6 +608,7 @@ export default function InventoryPage() {
               )}
             </div>
             <button
+              className="inventory-actions"
               onClick={() => { setEditingProduct(null); setProductModal(true) }}
               style={{ fontFamily: fontBody, background: ACCENT, color: BG_BASE, border: 'none', borderRadius: 8, padding: '10px 18px', fontSize: 13, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}>
               + Add product
@@ -563,12 +616,12 @@ export default function InventoryPage() {
           </div>
 
           {/* Table */}
-          <div style={{ ...card({ overflow: 'hidden', padding: 0 }), position: 'relative' }}>
+          <div className="inventory-table-wrap" style={{ ...card({ overflowX: 'auto', padding: 0 }), position: 'relative' }}>
             {loadingProducts && (
               <div style={{ fontFamily: fontBody, padding: 40, textAlign: 'center', color: TEXT_MUTED, fontSize: 13 }}>Loading…</div>
             )}
             {!loadingProducts && (
-              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <table className="inventory-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <thead>
                   <tr>
                     {['Product', 'SKU / Barcode', 'Category', 'Supplier', 'Price', 'Status', ''].map((h, i) => (
@@ -639,14 +692,14 @@ export default function InventoryPage() {
       {/* ── Categories ── */}
       {tab === 'categories' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-            <button onClick={() => { setEditingCategory(null); setCategoryModal(true) }}
+          <div className="inventory-toolbar" style={{ display: 'flex', justifyContent: 'flex-end' }}>
+            <button className="inventory-actions" onClick={() => { setEditingCategory(null); setCategoryModal(true) }}
               style={{ fontFamily: fontBody, background: ACCENT, color: BG_BASE, border: 'none', borderRadius: 8, padding: '10px 18px', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>
               + Add category
             </button>
           </div>
-          <div style={card({ overflow: 'hidden', padding: 0 })}>
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <div className="inventory-table-wrap" style={card({ overflow: 'hidden', padding: 0 })}>
+            <table className="inventory-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
                 <tr>
                   {['Name', 'Description', 'Products', ''].map((h, i) => (
@@ -690,14 +743,14 @@ export default function InventoryPage() {
       {/* ── Suppliers ── */}
       {tab === 'suppliers' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-            <button onClick={() => { setEditingSupplier(null); setSupplierModal(true) }}
+          <div className="inventory-toolbar" style={{ display: 'flex', justifyContent: 'flex-end' }}>
+            <button className="inventory-actions" onClick={() => { setEditingSupplier(null); setSupplierModal(true) }}
               style={{ fontFamily: fontBody, background: ACCENT, color: BG_BASE, border: 'none', borderRadius: 8, padding: '10px 18px', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>
               + Add supplier
             </button>
           </div>
-          <div style={card({ overflow: 'hidden', padding: 0 })}>
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <div className="inventory-table-wrap" style={card({ overflow: 'hidden', padding: 0 })}>
+            <table className="inventory-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
                 <tr>
                   {['Name', 'Contact', 'Address', 'Products', ''].map((h, i) => (

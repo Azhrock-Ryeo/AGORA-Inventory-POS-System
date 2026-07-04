@@ -167,9 +167,19 @@ const openEdit = (u: User) => {
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+    <div className="users-shell" style={{ display: 'flex', flexDirection: 'column', gap: 24, touchAction: 'pan-y' }}>
+      <style>{`
+        .users-shell { touch-action: pan-y; }
+        @media (max-width: 900px) {
+          .users-header { flex-direction: column !important; align-items: flex-start !important; gap: 12px; }
+          .users-stats { grid-template-columns: 1fr !important; }
+          .users-table-wrap { overflow-x: auto !important; overflow-y: hidden !important; -webkit-overflow-scrolling: touch; }
+          .users-table { min-width: 900px; }
+          .users-modal { width: min(92vw, 420px) !important; padding: 20px !important; }
+        }
+      `}</style>
       {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <div className="users-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div>
           <h1 style={{ fontFamily: fontDisplay, color: TEXT_PRIMARY, fontSize: 22, fontWeight: 500, margin: 0 }}>Users</h1>
           <p style={{ fontFamily: fontBody, color: TEXT_MUTED, fontSize: 13, marginTop: 4 }}>Manage system accounts and roles.</p>
@@ -178,7 +188,7 @@ const openEdit = (u: User) => {
       </div>
 
       {/* Stats row */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
+      <div className="users-stats" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
         {ROLES.filter((role) => {
           if (me?.role === 'SUPER_ADMIN') return role !== 'SUPER_ADMIN'
           if (me?.role === 'ADMIN') return role !== 'SUPER_ADMIN' && role !== 'ADMIN'
@@ -198,11 +208,11 @@ const openEdit = (u: User) => {
       </div>
 
       {/* Table */}
-      <div style={card}>
+      <div className="users-table-wrap" style={card}>
         {loading ? (
           <div style={{ fontFamily: fontBody, padding: 40, textAlign: 'center', color: TEXT_MUTED }}>Loading...</div>
         ) : (
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <table className="users-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr style={{ background: BG_BASE }}>
                 {['Name', 'Email', 'Role', 'Status', 'Joined', 'Actions'].map((h) => (
@@ -286,7 +296,7 @@ const openEdit = (u: User) => {
       {/* Modal */}
       {modalOpen && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50 }}>
-          <div style={{ background: BG_CARD, border: `1px solid ${BORDER}`, borderRadius: 16, padding: 28, width: 420, maxWidth: '90vw' }}>
+          <div className="users-modal" style={{ background: BG_CARD, border: `1px solid ${BORDER}`, borderRadius: 16, padding: 28, width: 420, maxWidth: '90vw' }}>
             <h2 style={{ fontFamily: fontDisplay, color: TEXT_PRIMARY, fontSize: 18, fontWeight: 500, margin: '0 0 20px' }}>
               {editing ? 'Edit User' : 'Add User'}
             </h2>

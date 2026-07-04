@@ -171,15 +171,26 @@ export default function ReportsPage() {
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+    <div className="reports-shell" style={{ display: 'flex', flexDirection: 'column', gap: 24, touchAction: 'pan-y' }}>
+      <style>{`
+        .reports-shell { touch-action: pan-y; }
+        @media (max-width: 900px) {
+          .reports-kpis { grid-template-columns: 1fr !important; }
+          .reports-grid { grid-template-columns: 1fr !important; }
+          .reports-header { flex-direction: column !important; align-items: flex-start !important; gap: 12px; }
+          .reports-periods { align-self: stretch !important; justify-content: space-between; }
+          .reports-table-wrap { overflow-x: auto !important; overflow-y: hidden !important; -webkit-overflow-scrolling: touch; }
+          .reports-table { min-width: 720px; }
+        }
+      `}</style>
 
       {/* Header + period toggle */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+      <div className="reports-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div>
           <h1 style={{ fontFamily: fontDisplay, color: TEXT_PRIMARY, fontSize: 22, fontWeight: 500, margin: 0 }}>Reports &amp; Analytics</h1>
           <p style={{ fontFamily: fontBody, color: TEXT_MUTED, fontSize: 13, marginTop: 4 }}>Business performance overview</p>
         </div>
-        <div style={{ display: 'flex', gap: 4, background: BG_CARD, border: `1px solid ${BORDER}`, borderRadius: 10, padding: 4 }}>
+        <div className="reports-periods" style={{ display: 'flex', gap: 4, background: BG_CARD, border: `1px solid ${BORDER}`, borderRadius: 10, padding: 4 }}>
           {PERIODS.map((p) => (
             <button
               key={p.key}
@@ -204,7 +215,7 @@ export default function ReportsPage() {
       </div>
 
       {/* KPI Cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
+      <div className="reports-kpis" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
         {kpis.map((kpi) => (
           <div key={kpi.label} style={card({ padding: 20 })}>
             <div style={labelStyle}>{kpi.label}</div>
@@ -217,7 +228,7 @@ export default function ReportsPage() {
       </div>
 
       {/* Sales Chart + Best Sellers */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 360px', gap: 16 }}>
+      <div className="reports-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 360px', gap: 16 }}>
 
         {/* Revenue line chart */}
         <div style={card({ padding: 24 })}>
@@ -328,7 +339,7 @@ export default function ReportsPage() {
       </div>
 
       {/* Orders table summary */}
-      <div style={card({ overflow: 'hidden', padding: 0 })}>
+      <div className="reports-table-wrap" style={card({ overflow: 'hidden', padding: 0 })}>
         <div style={{ padding: '16px 20px', borderBottom: `1px solid ${BORDER}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
             <div style={labelStyle}>Sales Breakdown</div>
@@ -341,7 +352,7 @@ export default function ReportsPage() {
         {salesLoading ? (
           <div style={{ fontFamily: fontBody, padding: '48px', textAlign: 'center', color: TEXT_MUTED, fontSize: 13 }}>Loading…</div>
         ) : (
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <table className="reports-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr>
                 {['Period', 'Orders', 'Revenue', 'Avg Order Value'].map((h, i) => (

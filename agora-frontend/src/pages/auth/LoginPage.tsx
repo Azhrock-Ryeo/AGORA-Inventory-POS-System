@@ -21,6 +21,7 @@ const colors = {
 export default function LoginPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
@@ -63,6 +64,7 @@ export default function LoginPage() {
 
   return (
     <div
+      className="login-shell"
       style={{
         minHeight: '100vh',
         display: 'flex',
@@ -72,7 +74,24 @@ export default function LoginPage() {
         padding: '20px',
       }}
     >
+      <style>{`
+        @media (max-width: 760px) {
+          .login-shell { padding: 12px; }
+          .login-card { flex-direction: column; min-height: auto; }
+          .login-brand-panel { flex: 1 1 auto; width: 100%; padding: 28px 24px; min-height: 180px; }
+          .login-form-panel { flex: 1 1 auto; width: 100%; padding: 28px 24px; }
+          .login-form { max-width: 100%; }
+        }
+        @media (max-width: 480px) {
+          .login-shell { padding: 8px; }
+          .login-brand-panel { padding: 22px 18px; }
+          .login-form-panel { padding: 22px 18px; }
+          .login-title { font-size: 20px !important; }
+          .login-subtitle { font-size: 12px !important; }
+        }
+      `}</style>
       <div
+        className="login-card"
         style={{
           width: '100%',
           maxWidth: '860px',
@@ -85,6 +104,7 @@ export default function LoginPage() {
       >
         {/* Ledger panel */}
         <div
+          className="login-brand-panel"
           style={{
             flex: '0 0 42%',
             background: colors.panelBg,
@@ -92,6 +112,7 @@ export default function LoginPage() {
             display: 'flex',
             flexDirection: 'column',
             justifyContent: 'space-between',
+            minWidth: 0,
           }}
         >
           <div>
@@ -146,35 +167,69 @@ export default function LoginPage() {
 
         {/* Form panel */}
         <div
+          className="login-form-panel"
           style={{
             flex: '1',
             background: colors.formBg,
             padding: '48px 44px',
             display: 'flex',
             alignItems: 'center',
+            minWidth: 0,
           }}
         >
-          <form onSubmit={handleLogin} style={{ width: '100%', maxWidth: '300px', margin: '0 auto' }}>
+          <form className="login-form" onSubmit={handleLogin} style={{ width: '100%', maxWidth: '340px', margin: '0 auto' }}>
             <div
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '8px',
+                padding: '6px 10px',
+                borderRadius: '999px',
+                background: 'rgba(245, 158, 11, 0.12)',
+                color: colors.amber,
+                fontFamily: "'Inter', sans-serif",
+                fontSize: '11px',
+                fontWeight: 700,
+                letterSpacing: '0.14em',
+                textTransform: 'uppercase',
+                marginBottom: '16px',
+              }}
+            >
+              <span
+                style={{
+                  width: '8px',
+                  height: '8px',
+                  borderRadius: '50%',
+                  background: colors.amber,
+                  display: 'inline-block',
+                }}
+              />
+              Secure POS access
+            </div>
+
+            <div
+              className="login-title"
               style={{
                 fontFamily: "'Fraunces', serif",
                 fontSize: '21px',
                 fontWeight: 500,
                 color: colors.textPrimary,
-                marginBottom: '4px',
+                marginBottom: '6px',
               }}
             >
-              Sign in to your store
+              Welcome back
             </div>
             <div
+              className="login-subtitle"
               style={{
                 fontFamily: "'Inter', sans-serif",
                 fontSize: '13px',
                 color: colors.textMuted,
-                marginBottom: '26px',
+                marginBottom: '24px',
+                lineHeight: 1.5,
               }}
             >
-              Cashier, manager, or admin — same door.
+              Sign in with your work email to continue managing sales, inventory, and reports.
             </div>
 
             {error && (
@@ -186,7 +241,7 @@ export default function LoginPage() {
                   fontSize: '13px',
                   background: colors.errorBg,
                   color: colors.errorText,
-                  borderRadius: '6px',
+                  borderRadius: '8px',
                   padding: '10px 12px',
                   marginBottom: '18px',
                 }}
@@ -212,23 +267,27 @@ export default function LoginPage() {
               type="email"
               placeholder="name@yourstore.ph"
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              onChange={(e) => {
+                setEmail(e.target.value)
+                setError('')
+              }}
               disabled={loading}
               autoFocus
               style={{
                 width: '100%',
-                border: 'none',
-                borderBottom: `1.5px solid ${colors.inputBorder}`,
-                background: 'transparent',
+                border: `1px solid ${colors.inputBorder}`,
+                background: 'rgba(255,255,255,0.03)',
                 fontFamily: "'Inter', sans-serif",
                 fontSize: '14px',
                 color: colors.textPrimary,
-                padding: '8px 2px',
-                borderRadius: 0,
-                marginBottom: '18px',
+                padding: '12px 14px',
+                borderRadius: '12px',
+                marginBottom: '16px',
                 outline: 'none',
                 boxSizing: 'border-box',
                 opacity: loading ? 0.6 : 1,
+                boxShadow: 'inset 0 1px 2px rgba(255,255,255,0.02)',
+                transition: 'border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease',
               }}
             />
 
@@ -244,29 +303,69 @@ export default function LoginPage() {
             >
               Password
             </label>
-            <input
-              id="login-password"
-              type="password"
-              placeholder="••••••••"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              disabled={loading}
-              style={{
-                width: '100%',
-                border: 'none',
-                borderBottom: `1.5px solid ${colors.inputBorder}`,
-                background: 'transparent',
-                fontFamily: "'Inter', sans-serif",
-                fontSize: '14px',
-                color: colors.textPrimary,
-                padding: '8px 2px',
-                borderRadius: 0,
-                marginBottom: '26px',
-                outline: 'none',
-                boxSizing: 'border-box',
-                opacity: loading ? 0.6 : 1,
-              }}
-            />
+            <div style={{ position: 'relative', marginBottom: '24px' }}>
+              <input
+                id="login-password"
+                type={showPassword ? 'text' : 'password'}
+                placeholder="••••••••"
+                value={password}
+                onChange={(e) => {
+                  setPassword(e.target.value)
+                  setError('')
+                }}
+                disabled={loading}
+                style={{
+                  width: '100%',
+                  border: `1px solid ${colors.inputBorder}`,
+                  background: 'rgba(255,255,255,0.03)',
+                  fontFamily: "'Inter', sans-serif",
+                  fontSize: '14px',
+                  color: colors.textPrimary,
+                  padding: '12px 14px',
+                  borderRadius: '12px',
+                  outline: 'none',
+                  boxSizing: 'border-box',
+                  opacity: loading ? 0.6 : 1,
+                  paddingRight: '58px',
+                  boxShadow: 'inset 0 1px 2px rgba(255,255,255,0.02)',
+                  transition: 'border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease',
+                }}
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword((value) => !value)}
+                disabled={loading}
+                aria-label={showPassword ? 'Hide password' : 'Show password'}
+                style={{
+                  position: 'absolute',
+                  right: '12px',
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  border: 'none',
+                  background: 'transparent',
+                  color: colors.textMuted,
+                  cursor: loading ? 'not-allowed' : 'pointer',
+                  padding: 0,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                {showPassword ? (
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z" />
+                    <circle cx="12" cy="12" r="3" />
+                  </svg>
+                ) : (
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <path d="M3 3l18 18" />
+                    <path d="M10.6 10.6A3 3 0 0 0 13.4 13.4" />
+                    <path d="M9.9 5.1A10.9 10.9 0 0 1 12 5c6.5 0 10 7 10 7a18.8 18.8 0 0 1-4.2 5.2" />
+                    <path d="M6.3 6.3A18.7 18.7 0 0 0 2 12s3.5 7 10 7a10.8 10.8 0 0 0 3.7-.7" />
+                  </svg>
+                )}
+              </button>
+            </div>
 
             <button
               type="submit"
@@ -283,7 +382,8 @@ export default function LoginPage() {
                 fontWeight: 600,
                 cursor: loading ? 'not-allowed' : 'pointer',
                 opacity: loading ? 0.7 : 1,
-                transition: '.15s',
+                boxShadow: loading ? 'none' : '0 10px 24px rgba(245, 158, 11, 0.22)',
+                transition: 'transform .15s ease, box-shadow .15s ease, opacity .15s ease',
               }}
             >
               {loading ? 'Signing in…' : 'Sign in →'}

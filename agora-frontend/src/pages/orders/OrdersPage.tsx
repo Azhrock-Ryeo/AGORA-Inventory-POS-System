@@ -322,7 +322,7 @@ export default function OrdersPage() {
   }, [showPayment, showOrderDetail, search, activeTab, cart, showReceipt])
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 0, height: '100%', minHeight: 0, fontFamily: fontBody }}>
+    <div className="orders-shell" style={{ display: 'flex', flexDirection: 'column', gap: 0, height: '100%', minHeight: 0, fontFamily: fontBody }}>
 
       {/* Local keyframes for micro-animations */}
       <style>{`
@@ -339,6 +339,23 @@ export default function OrdersPage() {
         .btn-glow { transition: box-shadow 0.18s ease, transform 0.12s ease, background 0.15s ease; }
         .btn-glow:not(:disabled):hover { box-shadow: 0 6px 18px -4px rgba(245,158,11,0.45); }
         .btn-glow:not(:disabled):active { transform: scale(0.97); }
+        @media (max-width: 960px) {
+          .orders-shell { gap: 12px !important; }
+          .orders-pos { flex-direction: column !important; overflow: visible !important; }
+          .orders-product-panel { width: 100% !important; min-width: 0 !important; overflow: visible !important; min-height: auto !important; }
+          .orders-cart-panel { width: 100% !important; max-width: none !important; flex: 0 0 auto !important; min-height: 320px !important; }
+        }
+        @media (max-width: 640px) {
+          .orders-header { flex-direction: column !important; align-items: flex-start !important; }
+          .orders-tab-row { width: 100% !important; }
+          .orders-tab-row button { flex: 1; justify-content: center; }
+          .orders-search-row { flex-direction: column !important; }
+          .orders-scan-btn { width: 100% !important; }
+          .orders-product-grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)) !important; }
+          .orders-cart-footer { padding: 12px !important; }
+          .orders-history-search { width: 100% !important; }
+          .orders-history-table { display: block; overflow-x: auto; white-space: nowrap; }
+        }
       `}</style>
 
       {/* Error Toast (scan/stock/PDF errors) */}
@@ -356,12 +373,12 @@ export default function OrdersPage() {
       )}
 
       {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+      <div className="orders-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20, gap: 12, flexWrap: 'wrap' }}>
         <div>
           <h1 style={{ fontFamily: fontDisplay, color: TEXT_PRIMARY, fontSize: 22, fontWeight: 500, margin: 0 }}>Orders</h1>
           <p style={{ color: TEXT_MUTED, fontSize: 13, marginTop: 4 }}>Point of Sale &amp; Order History</p>
         </div>
-        <div style={{ display: 'flex', gap: 8 }}>
+        <div className="orders-tab-row" style={{ display: 'flex', gap: 8 }}>
           {(['pos', 'history'] as ActiveTab[]).map((tab) => (
             <button
               key={tab}
@@ -382,10 +399,10 @@ export default function OrdersPage() {
 
       {/* POS Tab */}
       {activeTab === 'pos' && (
-        <div style={{ display: 'flex', gap: 16, flex: 1, minHeight: 0, overflow: 'hidden' }}>
+        <div className="orders-pos" style={{ display: 'flex', gap: 16, flex: 1, minHeight: 0, overflow: 'hidden' }}>
           {/* Product Grid */}
-          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 14, minHeight: 0 }}>
-            <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
+          <div className="orders-product-panel" style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 14, minHeight: 0, overflow: 'visible' }}>
+            <div className="orders-search-row" style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
               <div style={{ position: 'relative', flex: 1 }}>
                 <span style={{
                   position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)',
@@ -414,7 +431,7 @@ export default function OrdersPage() {
               </div>
               <button
                 onClick={() => setShowScanner(true)}
-                className="btn-glow"
+                className="btn-glow orders-scan-btn"
                 style={{
                   background: ACCENT_DIM, border: `1px solid ${ACCENT}`,
                   borderRadius: 8, padding: '10px 16px', color: ACCENT,
@@ -424,10 +441,11 @@ export default function OrdersPage() {
                 📷 Scan
               </button>
             </div>
-            <div style={{
+            <div className="orders-product-grid" style={{
               flex: 1, overflowY: 'auto', display: 'grid',
               gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))',
               gap: 14, alignContent: 'start',
+              maxHeight: 'none',
             }}>
               {products.map((product) => {
                 const stock = product.stock_level?.quantity ?? 0
@@ -485,7 +503,7 @@ export default function OrdersPage() {
           </div>
 
           {/* Cart Panel */}
-          <div style={card({ display: 'flex', flexDirection: 'column', width: 300, flexShrink: 0, overflow: 'hidden', padding: 0, boxShadow: '0 4px 16px -6px rgba(0,0,0,0.4)' })}>
+          <div className="orders-cart-panel" style={card({ display: 'flex', flexDirection: 'column', width: 300, flexShrink: 0, overflow: 'visible', padding: 0, boxShadow: '0 4px 16px -6px rgba(0,0,0,0.4)' })}>
             <div style={{ padding: '16px 20px', borderBottom: `1px solid ${BORDER}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <div>
                 <div style={{ color: TEXT_PRIMARY, fontSize: 14, fontWeight: 600 }}>Cart</div>
@@ -544,7 +562,7 @@ export default function OrdersPage() {
                 </div>
               ))}
             </div>
-            <div style={{ borderTop: `1px solid ${BORDER}`, padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <div className="orders-cart-footer" style={{ borderTop: `1px solid ${BORDER}`, padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
               <div>
                 <div style={labelStyle}>Discount</div>
                 <div style={{ display: 'flex', gap: 8 }}>
@@ -606,6 +624,7 @@ export default function OrdersPage() {
         <div style={{ flex: 1, overflowY: 'auto' }}>
           <div style={{ marginBottom: 16 }}>
             <input
+              className="orders-history-search"
               type="text"
               value={historySearch}
               onChange={(e) => setHistorySearch(e.target.value)}
@@ -631,7 +650,7 @@ export default function OrdersPage() {
 
           {!ordersLoading && !ordersError && (
             <div style={card({ overflow: 'hidden', padding: 0 })}>
-              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <table className="orders-history-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <thead>
                   <tr style={{ background: BG_BASE }}>
                     {['Order ID', 'Date', 'Cashier', 'Total', 'Status', ''].map((h) => (
