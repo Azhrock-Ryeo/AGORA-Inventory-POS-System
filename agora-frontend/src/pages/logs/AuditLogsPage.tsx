@@ -1,5 +1,6 @@
-import { useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useState, useEffect } from 'react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useLiveStore } from '../../stores/useLiveStore'
 import api from '../../services/api'
 
 // ── unified charcoal / white / amber theme (matches Sidebar/Topbar/Orders/Inventory/Stock/Reports) ─
@@ -92,6 +93,14 @@ export default function AuditLogsPage() {
       return res.data?.data ?? res.data ?? []
     },
   })
+
+const queryClient = useQueryClient()
+  const { auditLogChangedAt } = useLiveStore()
+
+  useEffect(() => {
+    queryClient.invalidateQueries({ queryKey: ['audit-logs'] })
+  }, [auditLogChangedAt])
+
 
   const clearFilters = () => {
     setSearch(''); setFilterModule(''); setFilterAction('')

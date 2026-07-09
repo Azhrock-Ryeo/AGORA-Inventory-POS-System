@@ -1,6 +1,7 @@
 import { Request, Response } from 'express'
 import bcrypt from 'bcryptjs'
 import prisma from '../utils/prisma'
+import { emitToUser, emitToRoles } from '../utils/socket'
 
 export async function getUsers(req: Request, res: Response) {
   try {
@@ -47,6 +48,7 @@ export async function createUser(req: Request, res: Response) {
       },
       include: { user_role: { include: { role: true } } },
     })
+    emitToRoles(['SUPER_ADMIN', 'ADMIN'], 'users:changed', { userId: user.id })
     res.status(201).json(user)
   } catch (err: any) {
     console.error('createUser error:', err)
@@ -89,6 +91,7 @@ export async function updateUser(req: Request, res: Response) {
         user_role: { include: { role: true } },
       },
     })
+    emitToRoles(['SUPER_ADMIN', 'ADMIN'], 'users:changed', { userId: user.id })
     res.json(user)
   } catch {
     res.status(500).json({ message: 'Failed to update user' })
@@ -119,6 +122,7 @@ export async function deleteUser(req: Request, res: Response) {
     }
 
     await prisma.user.delete({ where: { id } })
+    emitToRoles(['SUPER_ADMIN', 'ADMIN'], 'users:changed', { userId: id })
     res.json({ message: 'User deleted successfully' })
   } catch (err: any) {
     console.error(err)
@@ -150,6 +154,12 @@ export async function toggleUserStatus(req: Request, res: Response) {
         user_role: { include: { role: true } },
       },
     })
+
+    if (!user.is_active) {
+      emitToUser(id, 'user:deactivated', { userId: id })
+    }
+    emitToRoles(['SUPER_ADMIN', 'ADMIN'], 'users:changed', { userId: id })
+
     res.json(user)
   } catch {
     res.status(500).json({ message: 'Failed to toggle user status' })
