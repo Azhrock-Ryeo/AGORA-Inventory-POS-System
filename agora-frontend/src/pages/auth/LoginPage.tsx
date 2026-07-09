@@ -49,11 +49,12 @@ export default function LoginPage() {
       navigate('/dashboard')
     } catch (err: any) {
       const status = err?.response?.status
+      const backendMessage = err?.response?.data?.error
 
-      if (status === 401 || status === 400) {
-        setError('Invalid email or password.')
-      } else if (!err?.response) {
+      if (!err?.response) {
         setError('Unable to reach the server. Check your connection and try again.')
+      } else if (status === 401 || status === 400) {
+        setError(backendMessage || 'Invalid email or password.')
       } else {
         setError('Something went wrong. Please try again.')
       }

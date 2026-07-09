@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import type { User } from '../types'
+import api from '../services/api'
 
 interface AuthState {
   user: User | null
@@ -7,7 +8,7 @@ interface AuthState {
   isInitializing: boolean
   setAuth: (user: User, token: string) => void
   setToken: (token: string) => void
-  logout: () => void
+  logout: () => Promise<void>
   setInitializing: (value: boolean) => void
 }
 
@@ -21,6 +22,14 @@ export const useAuthStore = create<AuthState>()((set) => ({
   isInitializing: true,
   setAuth: (user, token) => set({ user, token, isInitializing: false }),
   setToken: (token) => set({ token }),
-  logout: () => set({ user: null, token: null }),
+  logout: async () => {
+    try {
+      await api.post('/auth/logout')
+    } catch {
+      // even if the request fails, clear local state so the UI doesn't get stuck
+    } finally {
+      set({ user: null, token: null })
+    }
+  },
   setInitializing: (value) => set({ isInitializing: value }),
 }))

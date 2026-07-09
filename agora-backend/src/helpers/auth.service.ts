@@ -2,11 +2,17 @@ import { PrismaClient } from '@prisma/client'
 import bcrypt from 'bcryptjs'
 import { signAccessToken, signRefreshToken, verifyRefreshToken } from '../utils/jwt'
 import { redis } from '../utils/redis'
+import jwt from 'jsonwebtoken'
 
 const prisma = new PrismaClient()
 
 const MAX_FAILED_ATTEMPTS = 5
 const LOCKOUT_DURATION = 15 * 60
+const SESSION_TTL = 7 * 24 * 60 * 60 // matches refresh cookie maxAge
+
+function sessionKey(userId: string) {
+  return `session:active:${userId}`
+}
 
 export async function loginUser(email: string, password: string) {
   const lockKey = `lockout:${email}`
@@ -54,9 +60,16 @@ export async function loginUser(email: string, password: string) {
     throw new Error('User has no assigned role')
   }
 
-const payload = { userId: user.id, name: user.name, role: roleName, roleId }
+  const existingSession = await redis.get(sessionKey(user.id))
+  if (existingSession) {
+    throw new Error('Already logged in elsewhere. Please log out from the other session first.')
+  }
+
+  const payload = { userId: user.id, name: user.name, role: roleName, roleId }
   const accessToken = signAccessToken(payload)
   const refreshToken = signRefreshToken(payload)
+
+  await redis.setex(sessionKey(user.id), SESSION_TTL, '1')
 
   return {
     accessToken,
@@ -95,13 +108,32 @@ export async function refreshUserToken(oldRefreshToken: string) {
     throw new Error('User has no assigned role')
   }
 
- const newPayload = { userId: user.id, name: user.name, role: roleName, roleId }
+  const newPayload = { userId: user.id, name: user.name, role: roleName, roleId }
   const accessToken = signAccessToken(newPayload)
   const newRefreshToken = signRefreshToken(newPayload)
+
+  await redis.expire(sessionKey(user.id), SESSION_TTL)
 
   return { accessToken, refreshToken: newRefreshToken }
 }
 
-export async function logoutUser(_refreshToken: string) {
-  return
+export async function logoutUser(refreshToken: string) {
+  let userId: string | undefined
+
+  try {
+    const payload = verifyRefreshToken(refreshToken)
+    userId = payload.userId
+  } catch (err: any) {
+    if (err?.name === 'TokenExpiredError') {
+      // Signature was already validated before the expiry check failed,
+      // so it's safe to decode (not verify) just to recover the userId.
+      const decoded = jwt.decode(refreshToken) as { userId?: string } | null
+      userId = decoded?.userId
+    }
+    // Any other error (bad signature, malformed) — don't trust it, leave userId undefined.
+  }
+
+  if (userId) {
+    await redis.del(sessionKey(userId))
+  }
 }
