@@ -16,14 +16,15 @@ export function auditLog(
       const logEntry = async () => {
         await prisma.auditLog.create({
           data: {
-            user_id: user?.userId ?? null,
-            user_role: user?.role ?? null,
-            module,
-            action,
-            description: getDescription ? getDescription(req) : `${action} on ${module}`,
-            ip_address: req.ip ?? null,
-            status,
-          },
+  user_id: user?.userId ?? null,
+  username: user?.name ?? null,
+  user_role: user?.role ?? null,
+  module,
+  action,
+  description: getDescription ? getDescription(req) : `${action} on ${module}`,
+  ip_address: req.ip ?? null,
+  status,
+},
         }).catch((err) => console.error('[Audit] Failed to log:', err))
       }
 

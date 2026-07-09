@@ -1,0 +1,5 @@
+[33m0ac6997[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32msprint-6/backend[m[33m)[m feat(socket): mount Socket.IO server for stock alerts and live updates
+[33m21917ec[m fix(transactions): add missing GET /transactions list endpoint and fix status matching
+[33m58f0e36[m[33m ([m[1;31morigin/sprint-6/backend[m[33m)[m fix(seed): update seed script to use UserRole join table instead of role_id column
+[33md0b97ad[m fix(users): correct role field mapping to match user_role.role.role_name API shape
+[33m59ad6c3[m fix(auth): allow localhost origin in CORS and remove duplicate Express app in server.ts
