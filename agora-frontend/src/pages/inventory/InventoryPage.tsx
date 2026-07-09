@@ -149,8 +149,8 @@ function ProductForm({ product, categories, suppliers, onSave, onClose }: {
     name: product?.name ?? '',
     sku: product?.sku ?? '',
     barcode: product?.barcode ?? '',
-    categoryId: product?.categoryId ?? '',
-    supplierId: product?.supplierId ?? '',
+  categoryId: (product as any)?.category_id ?? '',
+  supplierId: (product as any)?.supplier_id ?? '',
     price: product?.price ?? 0,
     status: product?.status ?? 'active',
     description: product?.description ?? '',
@@ -715,7 +715,7 @@ export default function InventoryPage() {
                     <td style={{ ...tdStyle, color: TEXT_PRIMARY, fontWeight: 600 }}>{c.name}</td>
                     <td style={{ ...tdStyle, color: TEXT_SECONDARY }}>{c.description || '—'}</td>
                     <td style={{ ...tdStyle, color: TEXT_SECONDARY, textAlign: 'right' }}>
-                      {products.filter((p) => p.categoryId === c.id).length}
+                      {products.filter((p) => (p as any).category_id === c.id).length}
                     </td>
                     <td style={{ ...tdStyle, textAlign: 'right' }}>
                       <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 6 }}>
@@ -767,7 +767,7 @@ export default function InventoryPage() {
                     <td style={{ ...tdStyle, color: TEXT_SECONDARY }}>{(s as any).contact_name || '—'}</td>
                     <td style={{ ...tdStyle, color: TEXT_SECONDARY }}>{s.address || '—'}</td>
                     <td style={{ ...tdStyle, color: TEXT_SECONDARY, textAlign: 'right' }}>
-                      {products.filter((p) => p.supplierId === s.id).length}
+                      {products.filter((p) => (p as any).supplier_id === s.id).length}
                     </td>
                     <td style={{ ...tdStyle, textAlign: 'right' }}>
                       <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 6 }}>

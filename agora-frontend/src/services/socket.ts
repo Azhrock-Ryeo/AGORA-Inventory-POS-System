@@ -11,8 +11,14 @@ export function getSocket(token?: string): Socket {
     auth: { token: token ?? '' },
     autoConnect: true,
     reconnection: true,
-    reconnectionAttempts: 5,
+    reconnectionAttempts: Infinity,
     reconnectionDelay: 2000,
+    reconnectionDelayMax: 10000,
+  })
+
+  socket.io.on('reconnect_failed', () => {
+    console.warn('[Socket] Reconnection failed permanently — clearing stale socket')
+    socket = null
   })
 
   socket.on('connect', () => {
