@@ -122,11 +122,10 @@ export function Sidebar() {
   const navigate = useNavigate()
   const [expanded, setExpanded] = useState(false)
 
-  const handleLogout = () => {
-    logout()
-    navigate('/login')
-  }
-
+  const handleLogout = async () => {
+  await logout()
+  navigate('/login')
+}
   const visibleNav = NAV.filter(
     (item) => !item.roles || (user?.role && item.roles.includes(user.role as Role))
   )

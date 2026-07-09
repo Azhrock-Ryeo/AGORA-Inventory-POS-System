@@ -21,10 +21,11 @@ export async function login(req: Request, res: Response) {
     res.status(200).json({ accessToken, user })
   } catch (err: any) {
     // safe to expose these specific messages to the client
-    const safeMessages = [
+   const safeMessages = [
       'Invalid credentials',
       'Account locked',
       'Too many failed attempts',
+      'Already logged in elsewhere',
     ]
     const isSafe = safeMessages.some((m) => err.message?.startsWith(m))
     res.status(401).json({ error: isSafe ? err.message : 'Login failed' })
