@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import api from '../../services/api'
 import { useAuthStore } from '../../stores/useAuthStore'
+import { useLiveStore } from '../../stores/useLiveStore'
 
 // ── unified charcoal / white / amber theme (matches Sidebar/Topbar/Orders/Inventory/Stock/Reports/AuditLogs) ─
 const BG_BASE = '#18181b'
@@ -79,6 +80,7 @@ const btnGhost: React.CSSProperties = {
 
 export default function UsersPage() {
   const { user: me } = useAuthStore()
+  const { usersChangedAt } = useLiveStore()
   const [users, setUsers] = useState<User[]>([])
   const [loading, setLoading] = useState(true)
   const [modalOpen, setModalOpen] = useState(false)
@@ -113,7 +115,7 @@ const handleDelete = async (u: User) => {
     }
   }
 
-  useEffect(() => { load() }, [])
+  useEffect(() => { load() }, [usersChangedAt])
 
   const openCreate = () => {
     setEditing(null)
