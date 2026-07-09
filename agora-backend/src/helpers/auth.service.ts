@@ -54,7 +54,7 @@ export async function loginUser(email: string, password: string) {
     throw new Error('User has no assigned role')
   }
 
-  const payload = { userId: user.id, role: roleName, roleId }
+const payload = { userId: user.id, name: user.name, role: roleName, roleId }
   const accessToken = signAccessToken(payload)
   const refreshToken = signRefreshToken(payload)
 
@@ -95,7 +95,7 @@ export async function refreshUserToken(oldRefreshToken: string) {
     throw new Error('User has no assigned role')
   }
 
-  const newPayload = { userId: user.id, role: roleName, roleId }
+ const newPayload = { userId: user.id, name: user.name, role: roleName, roleId }
   const accessToken = signAccessToken(newPayload)
   const newRefreshToken = signRefreshToken(newPayload)
 
