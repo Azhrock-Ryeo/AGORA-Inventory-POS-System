@@ -1,7 +1,7 @@
 import { Request, Response } from 'express'
 import bcrypt from 'bcryptjs'
 import prisma from '../utils/prisma'
-import { emitToUser, emitToRoles } from '../utils/socket'
+import { emitToUser, emitToRoles, isUserOnline } from '../utils/socket'
 
 export async function getUsers(req: Request, res: Response) {
   try {
@@ -19,7 +19,11 @@ export async function getUsers(req: Request, res: Response) {
       include: { user_role: { include: { role: true } } },
       orderBy: { created_at: 'desc' },
     })
-    res.json(users)
+    const usersWithPresence = users.map((u) => ({
+      ...u,
+      is_online: isUserOnline(u.id),
+    }))
+    res.json(usersWithPresence)
   } catch (err) {
     console.error(err)
     res.status(500).json({ message: 'Failed to fetch users' })

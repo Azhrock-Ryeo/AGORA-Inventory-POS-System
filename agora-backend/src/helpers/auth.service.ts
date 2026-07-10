@@ -9,11 +9,7 @@ const prisma = new PrismaClient()
 const MAX_FAILED_ATTEMPTS = 5
 const LOCKOUT_DURATION = 15 * 60
 const SESSION_TTL = 7 * 24 * 60 * 60 // matches refresh cookie maxAge
-const SESSION_LOCK_TTL = 30 * 60 // "already logged in" lock — self-heals if a session goes stale
-
-function sessionKey(userId: string) {
-  return `session:active:${userId}`
-}
+import { sessionKey, SESSION_LOCK_TTL } from '../utils/session'
 
 export async function loginUser(email: string, password: string) {
   const lockKey = `lockout:${email}`
