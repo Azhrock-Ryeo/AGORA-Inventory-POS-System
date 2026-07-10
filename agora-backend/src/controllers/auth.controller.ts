@@ -2,10 +2,12 @@ import { Request, Response } from 'express'
 import { loginUser, refreshUserToken, logoutUser } from '../helpers/auth.service'
 
 const REFRESH_COOKIE_NAME = 'refreshToken'
+const isProd = process.env.NODE_ENV === 'production'
+
 const REFRESH_COOKIE_OPTIONS = {
   httpOnly: true,
-  secure: true,
-  sameSite: 'none' as const,
+  secure: isProd,
+  sameSite: (isProd ? 'none' : 'lax') as 'none' | 'lax',
   maxAge: 7 * 24 * 60 * 60 * 1000,
   path: '/api/auth',
 }

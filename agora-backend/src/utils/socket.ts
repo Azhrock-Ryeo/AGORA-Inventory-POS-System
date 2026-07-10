@@ -1,8 +1,13 @@
 import { Server } from 'socket.io'
 import type { Server as HttpServer } from 'http'
 import jwt from 'jsonwebtoken'
+import { redis } from './redis'
 
 let io: Server
+
+function sessionKey(userId: string) {
+  return `session:active:${userId}`
+}
 
 export function initSocket(httpServer: HttpServer) {
   io = new Server(httpServer, {
@@ -37,8 +42,19 @@ export function initSocket(httpServer: HttpServer) {
 
     console.log('[Socket] Rooms after join:', [...socket.rooms])
 
-    socket.on('disconnect', (reason) => {
+    socket.on('disconnect', async (reason) => {
       console.log('[Socket] Client disconnected:', socket.id, reason)
+
+      if (user?.userId) {
+        // Only clear if no other socket for this user is still connected
+        // (multi-tab: closing one tab shouldn't log out a user who still
+        // has another tab open)
+        const room = io.sockets.adapter.rooms.get(`user:${user.userId}`)
+        if (!room || room.size === 0) {
+          await redis.del(sessionKey(user.userId))
+          console.log(`[Socket] Session cleared instantly for user ${user.userId}`)
+        }
+      }
     })
   })
 
