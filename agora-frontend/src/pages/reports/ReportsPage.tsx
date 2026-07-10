@@ -47,7 +47,7 @@ const labelStyle: React.CSSProperties = {
 const peso = (v: number) =>
   `₱${Number(v).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 
-type Period = 'daily' | 'weekly' | 'monthly'
+type Period = 'daily' | 'weekly' | 'monthly' | 'yearly'
 
 interface SalesDataPoint { label: string; revenue: number; orders: number }
 interface BestSeller { product_id: string; name: string; qty: number; revenue: number }
@@ -69,7 +69,7 @@ function CustomTooltip({ active, payload, label }: any) {
 }
 
 export default function ReportsPage() {
-  const [period, setPeriod] = useState<Period>('daily')
+  const [period, setPeriod] = useState<Period>('weekly')
 
   // ── Sales chart data ──────────────────────────────────────────────────────
   const { data: salesData = [], isLoading: salesLoading } = useQuery<SalesDataPoint[]>({
@@ -114,7 +114,9 @@ export default function ReportsPage() {
     { key: 'daily', label: 'Daily' },
     { key: 'weekly', label: 'Weekly' },
     { key: 'monthly', label: 'Monthly' },
+    { key: 'yearly', label: 'Yearly' },
   ]
+
 
   const kpis = [
     {
