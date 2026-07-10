@@ -2,11 +2,15 @@ import { Server } from 'socket.io'
 import type { Server as HttpServer } from 'http'
 import jwt from 'jsonwebtoken'
 import { redis } from './redis'
+import { sessionKey } from './session'
+import prisma from './prisma'
 
 let io: Server
 
-function sessionKey(userId: string) {
-  return `session:active:${userId}`
+const onlineUsers = new Set<string>()
+
+export function isUserOnline(userId: string) {
+  return onlineUsers.has(userId)
 }
 
 export function initSocket(httpServer: HttpServer) {
@@ -33,7 +37,11 @@ export function initSocket(httpServer: HttpServer) {
     const user = socket.data.user
     console.log('[Socket] Client connected:', socket.id, 'userId:', user?.userId, 'role:', user?.role)
 
-    if (user?.userId) socket.join(`user:${user.userId}`)
+    if (user?.userId) {
+      socket.join(`user:${user.userId}`)
+      onlineUsers.add(user.userId)
+      emitToRoles(['SUPER_ADMIN', 'ADMIN'], 'users:changed', { userId: user.userId })
+    }
 
     if (user?.role) {
       socket.join(`role:${user.role}`)
@@ -52,6 +60,12 @@ export function initSocket(httpServer: HttpServer) {
         const room = io.sockets.adapter.rooms.get(`user:${user.userId}`)
         if (!room || room.size === 0) {
           await redis.del(sessionKey(user.userId))
+          onlineUsers.delete(user.userId)
+          await prisma.user.update({
+            where: { id: user.userId },
+            data: { last_seen: new Date() },
+          }).catch(() => {})
+          emitToRoles(['SUPER_ADMIN', 'ADMIN'], 'users:changed', { userId: user.userId })
           console.log(`[Socket] Session cleared instantly for user ${user.userId}`)
         }
       }

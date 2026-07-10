@@ -31,6 +31,7 @@ interface User {
     }
   }
   is_active: boolean
+  is_online?: boolean
   created_at: string
 }
 
@@ -159,6 +160,11 @@ const openEdit = (u: User) => {
     }
   }
 
+ useEffect(() => {
+    const interval = setInterval(load, 15000)
+    return () => clearInterval(interval)
+  }, [])
+
   const handleToggle = async (u: User) => {
     try {
       const res = await api.patch(`/users/${u.id}/status`)
@@ -239,8 +245,20 @@ const openEdit = (u: User) => {
                     style={{ borderTop: `1px solid ${BORDER}` }}>
                     <td style={{ fontFamily: fontBody, padding: '14px 20px', color: TEXT_PRIMARY, fontSize: 13, fontWeight: 600 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                        <div style={{ width: 32, height: 32, borderRadius: '50%', background: BORDER, display: 'flex', alignItems: 'center', justifyContent: 'center', color: TEXT_SECONDARY, fontSize: 13, fontWeight: 700, flexShrink: 0 }}>
-                          {u.name[0].toUpperCase()}
+                        <div style={{ position: 'relative', width: 32, height: 32, flexShrink: 0 }}>
+                          <div style={{ width: 32, height: 32, borderRadius: '50%', background: BORDER, display: 'flex', alignItems: 'center', justifyContent: 'center', color: TEXT_SECONDARY, fontSize: 13, fontWeight: 700 }}>
+                            {u.name[0].toUpperCase()}
+                          </div>
+                          <span
+                            title={u.is_online ? 'Online' : 'Offline'}
+                            style={{
+                              position: 'absolute', bottom: -1, right: -1,
+                              width: 9, height: 9, borderRadius: '50%',
+                              background: u.is_online ? SUCCESS : TEXT_MUTED,
+                              border: `2px solid ${BG_CARD}`,
+                              boxShadow: u.is_online ? `0 0 0 2px ${SUCCESS_DIM}` : 'none',
+                            }}
+                          />
                         </div>
                         {u.name} {isMe && <span style={{ fontSize: 10, color: TEXT_MUTED, fontWeight: 400 }}>(you)</span>}
                       </div>
