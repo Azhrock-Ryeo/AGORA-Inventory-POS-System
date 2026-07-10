@@ -15,9 +15,8 @@ function getPeriodRange(period: string): { start: Date; end: Date; groupBy: 'day
     start = new Date(now.getFullYear(), now.getMonth(), 1)
     groupBy = 'day'
   } else {
-    // daily — last 7 days
+    // daily — just today
     start = new Date(now)
-    start.setDate(now.getDate() - 6)
     groupBy = 'day'
   }
 

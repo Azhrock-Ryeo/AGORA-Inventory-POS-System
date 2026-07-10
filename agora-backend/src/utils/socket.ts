@@ -15,6 +15,8 @@ export function isUserOnline(userId: string) {
 
 export function initSocket(httpServer: HttpServer) {
   io = new Server(httpServer, {
+    pingInterval: 10000,
+    pingTimeout: 5000,
     cors: {
       origin: ['http://localhost:5173', process.env.FRONTEND_URL].filter(Boolean) as string[],
       credentials: true,
@@ -54,19 +56,22 @@ export function initSocket(httpServer: HttpServer) {
       console.log('[Socket] Client disconnected:', socket.id, reason)
 
       if (user?.userId) {
-        // Only clear if no other socket for this user is still connected
-        // (multi-tab: closing one tab shouldn't log out a user who still
-        // has another tab open)
+        // Only clear presence if no other socket for this user is still connected
+        // (multi-tab: closing one tab shouldn't mark the user offline if they
+        // still have another tab open)
         const room = io.sockets.adapter.rooms.get(`user:${user.userId}`)
         if (!room || room.size === 0) {
-          await redis.del(sessionKey(user.userId))
+          // NOTE: do NOT delete the redis login lock (sessionKey) here.
+          // The lock enforces "one account, one active login" and must only
+          // be cleared by explicit logout or TTL expiry — not by a tab close,
+          // page refresh, or transient disconnect.
           onlineUsers.delete(user.userId)
           await prisma.user.update({
             where: { id: user.userId },
             data: { last_seen: new Date() },
           }).catch(() => {})
           emitToRoles(['SUPER_ADMIN', 'ADMIN'], 'users:changed', { userId: user.userId })
-          console.log(`[Socket] Session cleared instantly for user ${user.userId}`)
+          console.log(`[Socket] Presence cleared for user ${user.userId}`)
         }
       }
     })

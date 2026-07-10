@@ -83,9 +83,9 @@ export default function ReportsPage() {
 
   // ── Best sellers ──────────────────────────────────────────────────────────
   const { data: bestSellers = [], isLoading: sellersLoading } = useQuery<BestSeller[]>({
-    queryKey: ['reports-best-sellers'],
+    queryKey: ['reports-best-sellers', period],
     queryFn: async () => {
-      const res = await api.get('/reports/best-sellers')
+      const res = await api.get('/reports/best-sellers', { params: { period } })
       const raw = res.data?.data ?? res.data ?? []
       return Array.isArray(raw) ? raw : []
     },
