@@ -9,6 +9,7 @@ const prisma = new PrismaClient()
 const MAX_FAILED_ATTEMPTS = 5
 const LOCKOUT_DURATION = 15 * 60
 const SESSION_TTL = 7 * 24 * 60 * 60 // matches refresh cookie maxAge
+const SESSION_LOCK_TTL = 30 * 60 // "already logged in" lock — self-heals if a session goes stale
 
 function sessionKey(userId: string) {
   return `session:active:${userId}`
@@ -69,7 +70,7 @@ export async function loginUser(email: string, password: string) {
   const accessToken = signAccessToken(payload)
   const refreshToken = signRefreshToken(payload)
 
-  await redis.setex(sessionKey(user.id), SESSION_TTL, '1')
+  await redis.setex(sessionKey(user.id), SESSION_LOCK_TTL, '1')
 
   return {
     accessToken,
@@ -112,7 +113,7 @@ export async function refreshUserToken(oldRefreshToken: string) {
   const accessToken = signAccessToken(newPayload)
   const newRefreshToken = signRefreshToken(newPayload)
 
-  await redis.expire(sessionKey(user.id), SESSION_TTL)
+  await redis.expire(sessionKey(user.id), SESSION_LOCK_TTL)
 
   return { accessToken, refreshToken: newRefreshToken }
 }
