@@ -2,10 +2,10 @@ import { Request, Response } from 'express'
 import prisma from '../utils/prisma'
 
 // ── helpers ───────────────────────────────────────────────────────────────────
-function getPeriodRange(period: string): { start: Date; end: Date; groupBy: 'day' | 'week' | 'month' } {
+function getPeriodRange(period: string): { start: Date; end: Date; groupBy: 'day' | 'month' } {
   const now = new Date()
   let start: Date
-  let groupBy: 'day' | 'week' | 'month' = 'day'
+  let groupBy: 'day' | 'month' = 'day'
 
   if (period === 'weekly') {
     start = new Date(now)
@@ -14,10 +14,12 @@ function getPeriodRange(period: string): { start: Date; end: Date; groupBy: 'day
   } else if (period === 'monthly') {
     start = new Date(now.getFullYear(), now.getMonth(), 1)
     groupBy = 'day'
+  } else if (period === 'yearly') {
+    start = new Date(now.getFullYear(), 0, 1)
+    groupBy = 'month'
   } else {
-    // daily — last 7 days
+    // daily — just today
     start = new Date(now)
-    start.setDate(now.getDate() - 6)
     groupBy = 'day'
   }
 
@@ -25,7 +27,10 @@ function getPeriodRange(period: string): { start: Date; end: Date; groupBy: 'day
   return { start, end: now, groupBy }
 }
 
-function formatLabel(date: Date): string {
+function formatLabel(date: Date, groupBy: 'day' | 'month' = 'day'): string {
+  if (groupBy === 'month') {
+    return date.toLocaleDateString('en-PH', { month: 'short', year: 'numeric' })
+  }
   return date.toLocaleDateString('en-PH', { month: 'short', day: 'numeric' })
 }
 
@@ -44,16 +49,18 @@ export async function getSalesReport(req: Request, res: Response) {
       orderBy: { created_at: 'asc' },
     })
 
-    // group by day
+    // group by day or month depending on period
+    const { groupBy } = getPeriodRange(period)
     const map: Record<string, { revenue: number; orders: number }> = {}
     const cursor = new Date(start)
     while (cursor <= end) {
-      map[formatLabel(new Date(cursor))] = { revenue: 0, orders: 0 }
-      cursor.setDate(cursor.getDate() + 1)
+      map[formatLabel(new Date(cursor), groupBy)] = { revenue: 0, orders: 0 }
+      if (groupBy === 'month') cursor.setMonth(cursor.getMonth() + 1)
+      else cursor.setDate(cursor.getDate() + 1)
     }
 
     for (const order of orders) {
-      const label = formatLabel(new Date(order.created_at))
+      const label = formatLabel(new Date(order.created_at), groupBy)
       if (map[label]) {
         map[label].revenue += Number(order.total)
         map[label].orders += 1
@@ -111,7 +118,7 @@ export async function getBestSellers(req: Request, res: Response) {
 export async function getInventoryMovement(req: Request, res: Response) {
   try {
     const period = String(req.query.period ?? 'daily')
-    const { start, end } = getPeriodRange(period)
+    const { start, end, groupBy } = getPeriodRange(period)
 
     const movements = await prisma.stockMovement.findMany({
       where: { created_at: { gte: start, lte: end } },
@@ -122,13 +129,14 @@ export async function getInventoryMovement(req: Request, res: Response) {
     const map: Record<string, { label: string; stock_in: number; stock_out: number }> = {}
     const cursor = new Date(start)
     while (cursor <= end) {
-      const label = formatLabel(new Date(cursor))
+      const label = formatLabel(new Date(cursor), groupBy)
       map[label] = { label, stock_in: 0, stock_out: 0 }
-      cursor.setDate(cursor.getDate() + 1)
+      if (groupBy === 'month') cursor.setMonth(cursor.getMonth() + 1)
+      else cursor.setDate(cursor.getDate() + 1)
     }
 
     for (const m of movements) {
-      const label = formatLabel(new Date(m.created_at))
+      const label = formatLabel(new Date(m.created_at), groupBy)
       if (map[label]) {
         if (m.type === 'STOCK_IN') map[label].stock_in += m.quantity
         else map[label].stock_out += m.quantity

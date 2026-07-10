@@ -47,7 +47,7 @@ const labelStyle: React.CSSProperties = {
 const peso = (v: number) =>
   `₱${Number(v).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 
-type Period = 'daily' | 'weekly' | 'monthly'
+type Period = 'daily' | 'weekly' | 'monthly' | 'yearly'
 
 interface SalesDataPoint { label: string; revenue: number; orders: number }
 interface BestSeller { product_id: string; name: string; qty: number; revenue: number }
@@ -69,7 +69,7 @@ function CustomTooltip({ active, payload, label }: any) {
 }
 
 export default function ReportsPage() {
-  const [period, setPeriod] = useState<Period>('daily')
+  const [period, setPeriod] = useState<Period>('weekly')
 
   // ── Sales chart data ──────────────────────────────────────────────────────
   const { data: salesData = [], isLoading: salesLoading } = useQuery<SalesDataPoint[]>({
@@ -83,9 +83,9 @@ export default function ReportsPage() {
 
   // ── Best sellers ──────────────────────────────────────────────────────────
   const { data: bestSellers = [], isLoading: sellersLoading } = useQuery<BestSeller[]>({
-    queryKey: ['reports-best-sellers'],
+    queryKey: ['reports-best-sellers', period],
     queryFn: async () => {
-      const res = await api.get('/reports/best-sellers')
+      const res = await api.get('/reports/best-sellers', { params: { period } })
       const raw = res.data?.data ?? res.data ?? []
       return Array.isArray(raw) ? raw : []
     },
@@ -114,7 +114,9 @@ export default function ReportsPage() {
     { key: 'daily', label: 'Daily' },
     { key: 'weekly', label: 'Weekly' },
     { key: 'monthly', label: 'Monthly' },
+    { key: 'yearly', label: 'Yearly' },
   ]
+
 
   const kpis = [
     {
